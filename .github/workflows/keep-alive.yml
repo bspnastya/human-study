@@ -1,0 +1,13 @@
+name: keep-streamlit-awake
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit app
+        run: |
+          curl -fsS https://human-study-cyuwoelrrnf5szkm5stoja.streamlit.app/ || true
