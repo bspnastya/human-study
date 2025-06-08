@@ -125,7 +125,7 @@ if not st.session_state.name:
 i,qs=st.session_state.idx,st.session_state.questions
 if i<len(qs):
     
-    st_autorefresh(interval=1000, limit=TIME_LIMIT+2, key="t")
+    st_autorefresh(interval=1000, key=f"refresh_{i}")
 
     q=qs[i]
     if st.session_state.q_start is None:
