@@ -52,7 +52,7 @@ def get_sheet() -> gspread.Worksheet:
         "https://www.googleapis.com/auth/drive",
     ]
 
-    creds_dict = json.loads(st.secrets["gcp"]["creds"])
+    creds_dict = json.loads(st.secrets["gsp"]["creds"])
 
     gc = gspread.authorize(
         ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
