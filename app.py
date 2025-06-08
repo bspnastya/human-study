@@ -75,10 +75,8 @@ threading.Thread(target=_writer,daemon=True).start()
 
 
 TIME_LIMIT=30
-#def b64(p:str)->str:
-   # return "data:image/png;base64,"+base64.b64encode(open(p,"rb").read()).decode()
 
-CARDS=[   # image_id, method, filename, qtype, prompt, correct
+CARDS=[ 
  ("A","PCA" ,"https://storage.yandexcloud.net/test3123234442/pca_rgb_result_1.png","contrast"   ,"Сколько маленьких квадратиков вы видите?","37"),
  ("A","PCA" ,"https://storage.yandexcloud.net/test3123234442/pca_rgb_result_1.png","consistency","Круг и ромб одного цвета?"               ,"да"),
  ("A","UMAP","https://storage.yandexcloud.net/test3123234442/umap_rgb_result_1.png","contrast"   ,"Сколько маленьких квадратиков вы видите?","42"),
