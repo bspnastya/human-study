@@ -1,23 +1,16 @@
-
 from __future__ import annotations
 from streamlit_autorefresh import st_autorefresh
-import random, time, base64, datetime, secrets, math, os, threading, queue
+import random, time, datetime, secrets, threading, queue, re, itertools, math, json
 from typing import List, Dict
-import json
 import streamlit as st, streamlit.components.v1 as components
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-st.set_page_config(
-    page_title="Визуализация многоканальных изображений",
-    page_icon="🎯",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
 
-
-st.markdown("""
-<style>
+st.set_page_config(page_title="Визуализация многоканальных изображений",
+                   page_icon="🎯", layout="centered",
+                   initial_sidebar_state="collapsed")
+st.markdown("""<style>
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
 h1,h2,h3,h4,h5,h6{color:#111!important;}
@@ -38,8 +31,7 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
 <div id="mobile-overlay">
   Уважаемый&nbsp;участник,<br>
   данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
 
 @st.cache_resource(show_spinner="…")
@@ -71,39 +63,67 @@ def _writer():
 threading.Thread(target=_writer,daemon=True).start()
 
 
-TIME_LIMIT = 30
-CARDS = [
-    ("A","PCA" ,"https://storage.yandexcloud.net/test3123234442/pca_rgb_result_1.png","contrast","Сколько маленьких квадратиков вы видите?","37"),
-    ("A","PCA" ,"https://storage.yandexcloud.net/test3123234442/pca_rgb_result_1.png","consistency","Круг и ромб одного цвета?","да"),
-    ("A","UMAP","https://storage.yandexcloud.net/test3123234442/umap_rgb_result_1.png","contrast","Сколько маленьких квадратиков вы видите?","42"),
-    ("A","UMAP","https://storage.yandexcloud.net/test3123234442/umap_rgb_result_1.png","consistency","Все квадраты одного цвета?","нет"),
-    ("B","PCA" ,"https://storage.yandexcloud.net/test3123234442/pca_rgb_result_2.png","contrast","Сколько маленьких квадратиков вы видите?","35"),
-    ("B","PCA" ,"https://storage.yandexcloud.net/test3123234442/pca_rgb_result_2.png","consistency","Круг и ромб одного цвета?","нет"),
-    ("B","UMAP","https://storage.yandexcloud.net/test3123234442/umap_rgb_result_2.png","contrast","Сколько маленьких квадратиков вы видите?","40"),
-    ("B","UMAP","https://storage.yandexcloud.net/test3123234442/umap_rgb_result_2.png","consistency","Все квадраты одного цвета?","да"),
+BASE_URL   = "https://storage.yandexcloud.net/test3123234442"
+TIME_LIMIT = 15       
+INTRO_TIME = 8         
+
+GROUPS = [
+    "img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
+    "img4_same_corners","img5_same_corners","img6_same_corners_no_symb"
 ]
+ALGS = ["pca_rgb_result","socolov_lab_result","socolov_rgb_result","umap_rgb_result"]
+
+CORNER_ANS = {
+    "img1_dif_corners":"нет",
+    "img2_dif_corners":"нет",
+    "img3_same_corners_no_symb":"да",
+    "img4_same_corners":"да",
+    "img5_same_corners":"да",
+    "img6_same_corners_no_symb":"да",
+}
+LETTER_ANS = {
+    "img1_dif_corners":"ж",
+    "img2_dif_corners":"фя",
+    "img3_same_corners_no_symb":"",
+    "img4_same_corners":"аб",
+    "img5_same_corners":"юэы",
+    "img6_same_corners_no_symb":"",
+}
+
+def file_url(g:str,a:str)->str:
+    return f"{BASE_URL}/{g}_{a}.png"
 
 def make_questions() -> List[Dict]:
-    qs = [{"image_id":i, "method":m, "qtype":t, "prompt":p, "correct":c, "img":url}
-          for i,m,url,t,p,c in CARDS]
-    random.shuffle(qs)
-    for n,q in enumerate(qs, 1):
-        q["№"] = n
-    return qs
+    pool=[]
+    for g,a in itertools.product(GROUPS,ALGS):
+        pool.append(dict(group=g,alg=a,img=file_url(g,a),
+                         qtype="corners",
+                         prompt="Правый верхний и левый нижний угол — одного цвета?",
+                         correct=CORNER_ANS[g]))
+        pool.append(dict(group=g,alg=a,img=file_url(g,a),
+                         qtype="letters",
+                         prompt="Если на изображении вы видите буквы, то укажите, какие именно.",
+                         correct=LETTER_ANS[g]))
+    random.seed()
+    buckets={g:[] for g in GROUPS}
+    for c in pool: buckets[c["group"]].append(c)
+    for b in buckets.values(): random.shuffle(b)
+    ordered=[]; prev=None
+    while any(buckets.values()):
+        avail=[g for g,l in buckets.items() if l and g!=prev] or [g for g,l in buckets.items() if l]
+        g=random.choice(avail)
+        ordered.append(buckets[g].pop()); prev=g
+    for n,q in enumerate(ordered,1): q["№"]=n
+    return ordered
 
 if "questions" not in st.session_state:
-    st.session_state.update(questions=make_questions(),
-                            idx=0, name="", q_start=None)
-
-qs = st.session_state.questions
-total_q = len(qs)
+    st.session_state.update(questions=make_questions(), idx=0, name="", q_start=None,
+                            phase="intro", intro_start=None)
+qs=st.session_state.questions; total_q=len(qs)
 
 
-if st.session_state.get("blank_until", 0) > time.time():
-    st_autorefresh(interval=250, key="blank")
-    
-    st.markdown("")
-    st.stop()
+if st.session_state.get("blank_until",0)>time.time():
+    st_autorefresh(interval=250,key="blank"); st.stop()
 elif "blank_until" in st.session_state:
     del st.session_state["blank_until"]
 
@@ -115,7 +135,7 @@ if not st.session_state.name:
   <p><b>Как проходит эксперимент</b><br>
      В ходе эксперимента вам нужно будет отвечать на простые вопросы об изображениях, 
      которые вы увидите на экране. У вас будет 30 секунд на каждый вопрос. 
-     Всего вам предстоит ответить на <b>N</b> вопросов. 
+     Всего вам предстоит ответить на <b>48</b> вопросов. 
      Прохождение теста займет около 10-15 минут.</p>
   <p><b>Что это за изображения?</b><br>
      Изображения — результат работы разных методов. 
@@ -129,98 +149,116 @@ if not st.session_state.name:
      или нажмите «Сгенерировать псевдоним».</p>
 </div>
 """, unsafe_allow_html=True)
-
-    uname = st.text_input("", placeholder="Фамилия / псевдоним",
-                          key="username", label_visibility="collapsed")
+    uname=st.text_input("",placeholder="Фамилия / псевдоним",
+                        key="username",label_visibility="collapsed")
     if st.button("🎲 Сгенерировать псевдоним"):
-        st.session_state.name = f"Участник_{secrets.randbelow(900_000)+100_000}"
-        st.rerun()
-    if uname:
-        st.session_state.name = uname.strip()
-        st.rerun()
+        st.session_state.name=f"Участник_{secrets.randbelow(900_000)+100_000}"; st.rerun()
+    if uname: st.session_state.name=uname.strip(); st.rerun()
     st.stop()
 
+def letters_set(s:str)->set[str]:
+    s=re.sub(r"[ ,.;:-]+","",s.lower())
+    return set(s)
 
-i = st.session_state.idx
-if i < total_q:
-    
-    st_autorefresh(interval=1000, limit=TIME_LIMIT+2, key=f"t_{i}")
 
-    q = qs[i]
-    if st.session_state.q_start is None:
-        st.session_state.q_start = time.time()
-
-    elapsed = time.time() - st.session_state.q_start
-    left = max(math.ceil(TIME_LIMIT - elapsed), 0)
-
-    
-    if elapsed >= TIME_LIMIT:
-        ans = st.session_state.get(f"ans{i}", "")
-        ok = str(ans).strip().lower() == str(q["correct"]).lower()
-        ms = TIME_LIMIT * 1000
+def finish(ans:str):
+    q=qs[st.session_state.idx]
+    ms=int((time.time()-st.session_state.q_start)*1000) if st.session_state.q_start else 0
+    ok = (letters_set(ans)==letters_set(q["correct"])) if q["qtype"]=="letters" else \
+         (ans.lower()==q["correct"].lower())
+    if SHEET:
         log_q.put([datetime.datetime.utcnow().isoformat(), st.session_state.name,
-                   q["№"], q["image_id"], q["method"], q["qtype"],
-                   q["prompt"], ans, q["correct"], ms, ok])
-        q.update({"ответ": ans if ans else "—", "время, мс": f"{ms:,}",
-                  "✓": "✅" if ok else "❌"})
-        st.session_state.idx += 1
-        st.session_state.q_start = None
-        
-        st.session_state.blank_until = time.time() + 1.5
-        st.experimental_rerun()
+                   q["№"],q["group"],q["alg"],q["qtype"],
+                   q["prompt"],ans,q["correct"],ms,ok])
+    q.update({"ответ":ans or "—","время, мс":f"{ms:,}",
+              "✓":"✅" if ok else "❌"})
+    st.session_state.idx+=1
+    st.session_state.phase="intro"
+    st.session_state.intro_start=None
+    st.session_state.q_start=None
+    st.session_state.blank_until=time.time()+1.0
+    st.experimental_rerun()
 
-   
-    components.html(f"""
-    <div style="display:flex;gap:16px;height:70px">
+
+i=st.session_state.idx
+if i<total_q:
+    q=qs[i]
+
+ 
+    if st.session_state.phase=="intro":
+        if st.session_state.intro_start is None:
+            st.session_state.intro_start=time.time()
+        elapsed=time.time()-st.session_state.intro_start
+        left_intro=max(int(INTRO_TIME-elapsed),0)
+        st_autorefresh(interval=500,key=f"intro{i}")
+        if q["qtype"]=="corners":
+            st.markdown("""
+            <div style="font-size:1.1rem;">
+            Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
+            диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
+            и определить, окрашены ли они в один цвет.<br><br>
+            Картинка будет доступна в течение <b>15 секунд</b>. Время на ответ не ограничено.
+            </div>""", unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="font-size:1.1rem;">
+            Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
+            представленной картинке <b>буквы русского алфавита</b>.
+            Найденные буквы необходимо ввести в текстовое поле; допускается разделение
+            пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>
+            На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.
+            </div>""", unsafe_allow_html=True)
+        st.markdown(f"**Начало показа через&nbsp;{left_intro} с**")
+        if elapsed>=INTRO_TIME:
+            st.session_state.phase="question"
+            st.session_state.q_start=None
+            st.experimental_rerun()
+        st.stop()
+
+    
+    if st.session_state.q_start is None:
+        st.session_state.q_start=time.time()
+    elapsed_q=time.time()-st.session_state.q_start
+    left=max(TIME_LIMIT-int(elapsed_q),0)
+    st_autorefresh(interval=1000,key=f"q{i}")
+
+    components.html(f"""<div style="display:flex;gap:16px;height:70px">
       <div style="position:relative;width:70px;height:70px">
-        <svg width="70" height="70">
-          <circle cx="35" cy="35" r="26" stroke="#444" stroke-width="6" fill="none"/>
-          <circle cx="35" cy="35" r="26" stroke="#52b788" stroke-width="6"
-                  fill="none" stroke-dasharray="163.3628"
-                  stroke-dashoffset="{163.3628*(left/TIME_LIMIT)}"
-                  transform="rotate(-90 35 35)"/>
-        </svg>
+        <svg width="70" height="70"><circle cx="35" cy="35" r="26" stroke="#444"
+        stroke-width="6" fill="none"/><circle cx="35" cy="35" r="26"
+        stroke="#52b788" stroke-width="6" fill="none" stroke-dasharray="163.36"
+        stroke-dashoffset="{163.36*(left/TIME_LIMIT)}"
+        transform="rotate(-90 35 35)"/></svg>
         <span style="position:absolute;top:50%;left:50%;
-              transform:translate(-50%,-50%);font:700 1.2rem sans-serif;color:#52b788">
-          {left}
-        </span>
-      </div>
-    </div>
-    """, height=80)
+        transform:translate(-50%,-50%);font:700 1.2rem sans-serif;color:#52b788">{left}</span>
+      </div></div>""", height=80)
 
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
-    st.image(q["img"], clamp=True)
-
-    if q["qtype"] == "contrast":
-        _ = st.number_input(q["prompt"], key=f"ans{i}",
-                            min_value=0, step=1, format="%d")
+    if left>0:
+        st.image(q["img"],width=290,clamp=True)
     else:
-        _ = st.radio(q["prompt"], ["да", "нет"],
-                     key=f"ans{i}", horizontal=True, index=None)
+        st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
 
-    if st.button("Далее"):
-        ans = st.session_state.get(f"ans{i}", "")
-        ms = int((time.time() - st.session_state.q_start) * 1000)
-        ok = str(ans).strip().lower() == str(q["correct"]).lower()
-        log_q.put([datetime.datetime.utcnow().isoformat(), st.session_state.name,
-                   q["№"], q["image_id"], q["method"], q["qtype"],
-                   q["prompt"], ans, q["correct"], ms, ok])
-        q.update({"ответ": ans if ans else "—", "время, мс": f"{ms:,}",
-                  "✓": "✅" if ok else "❌"})
-        st.session_state.idx += 1
-        st.session_state.q_start = None
-        
-        st.session_state.blank_until = time.time() + 1.5
-        st.experimental_rerun()
-
+    if q["qtype"]=="corners":
+        sel=st.radio(q["prompt"],
+                     ("Да, углы одного цвета.","Нет, углы окрашены в разные цвета."),
+                     index=None,key=f"radio{i}")
+        if sel: finish("да" if sel.startswith("Да") else "нет")
+    else:
+        txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
+        if txt and txt!="Не вижу":
+            if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+                finish(txt.strip())
+            else:
+                st.error("Допустимы только русские буквы и знаки пунктуации.")
+        if st.button("Не вижу букв",key=f"skip{i}"):
+            finish("Не вижу")
 
 else:
-    correct = sum(1 for q in qs if q.get("✓") == "✅")
+    correct=sum(1 for q in qs if q.get("✓")=="✅")
     st.success(f"Готово, {st.session_state.name}!")
-    st.markdown(f"""
-    <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
-                color:#fff;background:#262626;border-radius:12px;">
-        Ваш результат:<br><b>{correct} / {total_q}</b> верных ответов
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
+    color:#fff;background:#262626;border-radius:12px;">Ваш результат:<br><b>{correct} / {total_q}</b></div>""",
+                unsafe_allow_html=True)
     st.balloons()
+
