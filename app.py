@@ -87,7 +87,7 @@ LETTER_ANS = {
     "img3_same_corners_no_symb":"",
     "img4_same_corners":"аб",
     "img5_same_corners":"юэы",
-    "img6_same_corners_no_symb":"",
+    "img6_same_corners_no_symb":"Не вижу",
 }
 
 def file_url(g:str,a:str)->str:
