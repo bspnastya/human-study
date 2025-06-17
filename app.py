@@ -84,7 +84,7 @@ CORNER_ANS = {
 LETTER_ANS = {
     "img1_dif_corners":"ж",
     "img2_dif_corners":"фя",
-    "img3_same_corners_no_symb":"",
+    "img3_same_corners_no_symb":"Не вижу",
     "img4_same_corners":"аб",
     "img5_same_corners":"юэы",
     "img6_same_corners_no_symb":"Не вижу",
