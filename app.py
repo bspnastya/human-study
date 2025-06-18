@@ -63,7 +63,7 @@ threading.Thread(target=_writer,daemon=True).start()
 
 
 BASE_URL   = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 15      
+TIME_LIMIT = 15   
 
 GROUPS = [
     "img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
@@ -165,8 +165,8 @@ if i<total_q:
     q=qs[i]
 
     
+    intro_limit = 8 if i<5 else 2
     if st.session_state.phase=="intro":
-        intro_limit = 8 if i<5 else 2
         if st.session_state.intro_start is None:
             st.session_state.intro_start=time.time()
         elapsed=time.time()-st.session_state.intro_start
@@ -196,7 +196,7 @@ if i<total_q:
             st.experimental_rerun()
         st.stop()
 
-    # ---------- question ----------
+    
     if st.session_state.q_start is None:
         st.session_state.q_start=time.time()
     elapsed_q=time.time()-st.session_state.q_start
@@ -227,19 +227,21 @@ if i<total_q:
         sel=st.radio(q["prompt"],list(sel_map.keys()),index=None,key=f"radio{i}")
         if sel: finish(sel_map[sel])
     else:
-        cols=st.columns([3,1])
-        with cols[0]:
+        col_input,col_btn=st.columns([3,1])
+        with col_input:
             txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
-        with cols[1]:
-            if st.button("Ответить",key=f"submit{i}",use_container_width=True) and txt:
-                if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
-                    finish(txt.strip())
-                else:
+        with col_btn:
+            if st.button("Ответить",key=f"submit{i}",use_container_width=True):
+                if not txt:
+                    st.warning("Введите ответ или нажмите «Не вижу букв».")
+                elif not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
                     st.error("Допустимы только русские буквы и знаки пунктуации.")
-        if st.button("Не вижу букв",key=f"skip{i}",use_container_width=True):
-            finish("Не вижу")
+                else:
+                    finish(txt.strip())
+        st.button("Не вижу букв",key=f"skip{i}",use_container_width=True,on_click=lambda:finish("Не вижу"))
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
+
 
 
