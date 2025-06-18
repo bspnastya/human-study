@@ -1,6 +1,6 @@
 from __future__ import annotations
 from streamlit_autorefresh import st_autorefresh
-import random, time, datetime, secrets, threading, queue, re, itertools, math, json
+import random, time, datetime, secrets, threading, queue, re, itertools, json
 from typing import List, Dict
 import streamlit as st, streamlit.components.v1 as components
 import gspread
@@ -40,36 +40,35 @@ def get_sheet() -> gspread.Worksheet:
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive",
     ]
-
     creds_dict = dict(st.secrets["gsp"])
-
     gc = gspread.authorize(
         ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
     )
-
     return gc.open("human_study_results").sheet1
-
-
-SHEET = get_sheet()
-
+try:
+    SHEET = get_sheet()
+except Exception:
+    SHEET = None
 
 log_q: queue.Queue[List] = queue.Queue()
 def _writer():
     while True:
         row=log_q.get()
-        try:SHEET.append_row(row)
-        except Exception as e:print("Sheets error:",e)
+        try:
+            if SHEET: SHEET.append_row(row)
+        except Exception as e:
+            print("Sheets error:",e)
         log_q.task_done()
 threading.Thread(target=_writer,daemon=True).start()
 
 
 BASE_URL   = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15       
-INTRO_TIME = 8         
+INTRO_TIME = 8        
 
-GROUPS = [
+GROUPS = [               
     "img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
-    "img4_same_corners","img5_same_corners","img6_same_corners_no_symb"
+    "img4_same_corners","img5_same_corners"
 ]
 ALGS = ["pca_rgb_result","socolov_lab_result","socolov_rgb_result","umap_rgb_result"]
 
@@ -79,7 +78,6 @@ CORNER_ANS = {
     "img3_same_corners_no_symb":"да",
     "img4_same_corners":"да",
     "img5_same_corners":"да",
-    "img6_same_corners_no_symb":"да",
 }
 LETTER_ANS = {
     "img1_dif_corners":"ж",
@@ -87,11 +85,9 @@ LETTER_ANS = {
     "img3_same_corners_no_symb":"Не вижу",
     "img4_same_corners":"аб",
     "img5_same_corners":"юэы",
-    "img6_same_corners_no_symb":"Не вижу",
 }
 
-def file_url(g:str,a:str)->str:
-    return f"{BASE_URL}/{g}_{a}.png"
+def file_url(g:str,a:str)->str: return f"{BASE_URL}/{g}_{a}.png"
 
 def make_questions() -> List[Dict]:
     pool=[]
@@ -183,7 +179,6 @@ i=st.session_state.idx
 if i<total_q:
     q=qs[i]
 
- 
     if st.session_state.phase=="intro":
         if st.session_state.intro_start is None:
             st.session_state.intro_start=time.time()
@@ -214,7 +209,6 @@ if i<total_q:
             st.experimental_rerun()
         st.stop()
 
-    
     if st.session_state.q_start is None:
         st.session_state.q_start=time.time()
     elapsed_q=time.time()-st.session_state.q_start
@@ -239,25 +233,24 @@ if i<total_q:
         st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
 
     if q["qtype"]=="corners":
-        sel=st.radio(q["prompt"],
-                     ("Да, углы одного цвета.","Нет, углы окрашены в разные цвета."),
-                     index=None,key=f"radio{i}")
-        if sel: finish("да" if sel.startswith("Да") else "нет")
+        sel_map={"Да, углы одного цвета.":"да",
+                 "Нет, углы окрашены в разные цвета.":"нет",
+                 "Затрудняюсь ответить":"затрудняюсь"}
+        sel=st.radio(q["prompt"],list(sel_map.keys()),index=None,key=f"radio{i}")
+        if sel: finish(sel_map[sel])
     else:
         txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
-        if txt and txt!="Не вижу":
-            if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
-                finish(txt.strip())
-            else:
-                st.error("Допустимы только русские буквы и знаки пунктуации.")
-        if st.button("Не вижу букв",key=f"skip{i}"):
-            finish("Не вижу")
+        col1,col2=st.columns([1,1])
+        with col1:
+            if st.button("Ответить",key=f"submit{i}") and txt:
+                if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+                    finish(txt.strip())
+                else:
+                    st.error("Допустимы только русские буквы и знаки пунктуации.")
+        with col2:
+            if st.button("Не вижу букв",key=f"skip{i}"):
+                finish("Не вижу")
 
 else:
-    correct=sum(1 for q in qs if q.get("✓")=="✅")
-    st.success(f"Готово, {st.session_state.name}!")
-    st.markdown(f"""<div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
-    color:#fff;background:#262626;border-radius:12px;">Ваш результат:<br><b>{correct} / {total_q}</b></div>""",
-                unsafe_allow_html=True)
-    st.balloons()
+    st.success("Вы завершили прохождение. Спасибо за участие!")
 
