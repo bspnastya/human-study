@@ -38,7 +38,7 @@ div[data-testid="column"] > div {
   text-align:center;padding:0 20px;}
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
 
-
+/* Стили для HTML кнопок */
 .custom-buttons {
     display: flex;
     gap: 8px;
@@ -281,7 +281,20 @@ if i<total_q:
         if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
             st.error("Допустимы только русские буквы и знаки пунктуации.")
 
-
+     
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            submit_clicked = st.button("Ответить", key=f"submit{i}", 
+                                     help="Скрытая кнопка", 
+                                     type="secondary")
+        
+        with col2:
+            skip_clicked = st.button("Не вижу букв", key=f"skip{i}", 
+                                   help="Скрытая кнопка", 
+                                   type="secondary")
+        
+     
         button_html = f"""
         <div class="custom-buttons">
             <button class="custom-btn btn-submit" onclick="submitAnswer()">Ответить</button>
@@ -303,31 +316,46 @@ if i<total_q:
                 return;
             }}
             
-           
-            window.parent.postMessage({{
-                type: 'streamlit:setComponentValue',
-                value: {{ action: 'submit', text: inputValue }}
-            }}, '*');
+            
+            const buttons = parent.document.querySelectorAll('button[data-testid="baseButton-secondary"]');
+            buttons.forEach(button => {{
+                if (button.textContent.includes('Ответить')) {{
+                    button.click();
+                }}
+            }});
         }}
         
         function skipAnswer() {{
-            window.parent.postMessage({{
-                type: 'streamlit:setComponentValue',
-                value: {{ action: 'skip', text: 'Не вижу' }}
-            }}, '*');
+            
+            const buttons = parent.document.querySelectorAll('button[data-testid="baseButton-secondary"]');
+            buttons.forEach(button => {{
+                if (button.textContent.includes('Не вижу букв')) {{
+                    button.click();
+                }}
+            }});
         }}
+        
+       
+        setTimeout(() => {{
+            const columns = parent.document.querySelectorAll('div[data-testid="column"]');
+            columns.forEach(col => {{
+                col.style.display = 'none';
+            }});
+        }}, 100);
         </script>
         """
         
-       
-        button_result = components.html(button_html, height=80, key=f"buttons{i}")
+        components.html(button_html, height=80)
         
-  
-        if button_result:
-            if button_result.get('action') == 'submit':
-                finish(button_result.get('text', ''))
-            elif button_result.get('action') == 'skip':
-                finish("Не вижу")
+       
+        if submit_clicked and txt:
+            if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+                finish(txt.strip())
+            else:
+                st.error("Исправьте ответ — только русские буквы и знаки пунктуации.")
+        
+        if skip_clicked:
+            finish("Не вижу")
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
