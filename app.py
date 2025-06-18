@@ -349,7 +349,7 @@ if i < total_q:
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
-
+    st.balloons()
 
 
 
