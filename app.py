@@ -7,7 +7,6 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 
-# ============ базовый стиль и конфиг =============
 st.set_page_config(page_title="Визуализация многоканальных изображений",
                    page_icon="🎯", layout="centered",
                    initial_sidebar_state="collapsed")
@@ -16,7 +15,6 @@ st.markdown(r"""
 <style>
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
-/* прочие стили сохранены */
 .stButton>button{min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;
                  background:#222!important;color:#ddd!important;border-radius:8px;}
 div[data-testid="stButton"][id*="skip"] button{background:#8d0801!important;border-color:#8d0801!important;}
@@ -24,7 +22,7 @@ div[data-testid="stButton"][id*="skip"] button:hover{background:#7a0701!importan
 </style>
 """, unsafe_allow_html=True)
 
-# ------------- Sheets -------------
+
 @st.cache_resource(show_spinner="…")
 def get_sheet()->gspread.Worksheet:
     scopes=["https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive"]
@@ -43,7 +41,7 @@ def _writer():
         log_q.task_done()
 threading.Thread(target=_writer,daemon=True).start()
 
-# ------------- данные -------------
+
 BASE_URL="https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT=15
 GROUPS=["img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb","img4_same_corners","img5_same_corners"]
@@ -75,7 +73,6 @@ if "questions" not in st.session_state:
                             intro_start=None,q_start=None)
 qs=st.session_state.questions; tot=len(qs)
 
-# ---------- белый экран между вопросами ----------
 if st.session_state.get("blank_until",0)>time.time():
     st_autorefresh(interval=250,key="b"); st.stop()
 elif "blank_until" in st.session_state: del st.session_state["blank_until"]
@@ -115,19 +112,17 @@ def finish(ans:str):
     st.session_state.q_start=None; st.session_state.blank_until=time.time()+1
     st.experimental_rerun()
 
-
 i=st.session_state.idx
-if i<tot:
+if i<total_q:
     q=qs[i]
-
-
     intro_limit=8 if i<5 else 2
     if st.session_state.phase=="intro":
         if st.session_state.intro_start is None: st.session_state.intro_start=time.time()
         elapsed=time.time()-st.session_state.intro_start
-        st.markdown(f"**Начало показа через {max(int(intro_limit-elapsed),0)} с**")
-        st_autorefresh(interval=1000,key=f"in{i}")
-         if q["qtype"]=="corners":
+        left_intro=max(int(intro_limit-elapsed),0)
+        st_autorefresh(interval=500,key=f"intro{i}")
+
+        if q["qtype"]=="corners":
             st.markdown("""
             <div style="font-size:1.1rem;">
             Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
@@ -144,6 +139,7 @@ if i<tot:
             пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>
             На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.
             </div>""",unsafe_allow_html=True)
+        st.markdown(f"**Начало показа через&nbsp;{left_intro} с**")
         if elapsed>=intro_limit:
             st.session_state.phase="question"; st.session_state.q_start=None; st.experimental_rerun()
         st.stop()
