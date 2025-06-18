@@ -25,23 +25,24 @@ input[data-testid="stTextInput"]{
   min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;
   background:#222!important;color:#ddd!important;border-radius:8px;}
 
-
-button[data-testid="baseButton-secondary"]:has([data-testid="stMarkdownContainer"]:contains("Ответить")),
-div[data-testid="column"]:first-child button {
-    background:#2d6a4f!important;
-    border-color:#2d6a4f!important;
-}
-
-
-button[data-testid="baseButton-secondary"]:has([data-testid="stMarkdownContainer"]:contains("Не вижу букв")),
-div[data-testid="column"]:last-child button {
-    background:#8d0801!important;
-    border-color:#8d0801!important;
-}
-
-
 div[data-testid="column"] {
-    padding: 0 4px !important;
+    padding: 0 5px !important;
+}
+
+div[data-testid="column"] > div {
+    padding: 0 !important;
+}
+
+button[kind="secondary"]:contains("Ответить"),
+.stButton button:contains("Ответить") {
+    background: #2d6a4f !important;
+    border-color: #2d6a4f !important;
+}
+
+button[kind="secondary"]:contains("Не вижу букв"),
+.stButton button:contains("Не вижу букв") {
+    background: #8d0801 !important;
+    border-color: #8d0801 !important;
 }
 
 #mobile-overlay{position:fixed;inset:0;z-index:9999;background:#808080;display:none;
@@ -247,18 +248,44 @@ if i<total_q:
         if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
             st.error("Допустимы только русские буквы и знаки пунктуации.")
 
-      
-        col_sub, col_skip = st.columns([1, 1])
+    
+        col1, col2 = st.columns([1, 1])
         
-        with col_sub:
-            if st.button("Ответить",key=f"submit{i}") and txt:
-                if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+       
+        st.components.v1.html("""
+        <script>
+        setTimeout(function() {
+        
+            const buttons = parent.document.querySelectorAll('button[data-testid="baseButton-secondary"]');
+            buttons.forEach(function(button) {
+                if (button.textContent.includes('Ответить')) {
+                    button.style.background = '#2d6a4f';
+                    button.style.borderColor = '#2d6a4f';
+                }
+                if (button.textContent.includes('Не вижу букв')) {
+                    button.style.background = '#8d0801';
+                    button.style.borderColor = '#8d0801';
+                }
+            });
+            
+           
+            const columns = parent.document.querySelectorAll('div[data-testid="column"]');
+            columns.forEach(function(col) {
+                col.style.padding = '0 5px';
+            });
+        }, 100);
+        </script>
+        """, height=0)
+        
+        with col1:
+            if st.button("Ответить", key=f"submit{i}") and txt:
+                if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
                     finish(txt.strip())
                 else:
                     st.error("Исправьте ответ — только русские буквы и знаки пунктуации.")
         
-        with col_skip:
-            if st.button("Не вижу букв",key=f"skip{i}"):
+        with col2:
+            if st.button("Не вижу букв", key=f"skip{i}"):
                 finish("Не вижу")
 
 else:
