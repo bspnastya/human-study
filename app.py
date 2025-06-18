@@ -25,8 +25,24 @@ input[data-testid="stTextInput"]{
   min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;
   background:#222!important;color:#ddd!important;border-radius:8px;}
 
-div[id^="submit"] button{background:#2d6a4f!important;}  
-div[id^="skip"]   button{background:#8d0801!important;}  
+
+button[data-testid="baseButton-secondary"]:has([data-testid="stMarkdownContainer"]:contains("Ответить")),
+div[data-testid="column"]:first-child button {
+    background:#2d6a4f!important;
+    border-color:#2d6a4f!important;
+}
+
+
+button[data-testid="baseButton-secondary"]:has([data-testid="stMarkdownContainer"]:contains("Не вижу букв")),
+div[data-testid="column"]:last-child button {
+    background:#8d0801!important;
+    border-color:#8d0801!important;
+}
+
+
+div[data-testid="column"] {
+    padding: 0 4px !important;
+}
 
 #mobile-overlay{position:fixed;inset:0;z-index:9999;background:#808080;display:none;
   align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;
@@ -231,14 +247,19 @@ if i<total_q:
         if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
             st.error("Допустимы только русские буквы и знаки пунктуации.")
 
-        col_sub, gap, col_skip = st.columns([1,0.08,1])
-        if col_sub.button("Ответить",key=f"submit{i}") and txt:
-            if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
-                finish(txt.strip())
-            else:
-                st.error("Исправьте ответ — только русские буквы и знаки пунктуации.")
-        if col_skip.button("Не вижу букв",key=f"skip{i}"):
-            finish("Не вижу")
+      
+        col_sub, col_skip = st.columns([1, 1])
+        
+        with col_sub:
+            if st.button("Ответить",key=f"submit{i}") and txt:
+                if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+                    finish(txt.strip())
+                else:
+                    st.error("Исправьте ответ — только русские буквы и знаки пунктуации.")
+        
+        with col_skip:
+            if st.button("Не вижу букв",key=f"skip{i}"):
+                finish("Не вижу")
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
