@@ -53,17 +53,18 @@ except Exception:
 log_q: queue.Queue[List] = queue.Queue()
 def _writer():
     while True:
-        row=log_q.get()
+        row = log_q.get()
         try:
-            if SHEET: SHEET.append_row(row)
+            if SHEET:
+                SHEET.append_row(row)
         except Exception as e:
-            print("Sheets error:",e)
+            print("Sheets error:", e)
         log_q.task_done()
-threading.Thread(target=_writer,daemon=True).start()
+threading.Thread(target=_writer, daemon=True).start()
 
 
 BASE_URL   = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 15        
+TIME_LIMIT = 15 
 
 GROUPS = [
     "img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
@@ -138,8 +139,8 @@ if not st.session_state.name:
     uname=st.text_input("",placeholder="Фамилия / псевдоним",
                         key="username",label_visibility="collapsed")
     if st.button("🎲 Сгенерировать псевдоним"):
-        st.session_state.name=f"Участник_{secrets.randbelow(900_000)+100_000}"; st.rerun()
-    if uname: st.session_state.name=uname.strip(); st.rerun()
+        st.session_state.name=f"Участник_{secrets.randbelow(900_000)+100_000}"; st.experimental_rerun()
+    if uname: st.session_state.name=uname.strip(); st.experimental_rerun()
     st.stop()
 
 def letters_set(s:str)->set[str]:
@@ -158,13 +159,13 @@ def finish(ans:str):
     st.session_state.idx+=1
     st.session_state.phase="intro"; st.session_state.intro_start=None
     st.session_state.q_start=None; st.session_state.blank_until=time.time()+1.0
-    st.rerun()
+    st.experimental_rerun()
 
 i=st.session_state.idx
 if i<total_q:
     q=qs[i]
 
-  
+
     intro_limit = 8 if i<5 else 2
     if st.session_state.phase=="intro":
         if st.session_state.intro_start is None:
@@ -193,7 +194,7 @@ if i<total_q:
         st.markdown(f"**Начало показа через&nbsp;{left_intro} с**")
         if elapsed>=intro_limit:
             st.session_state.phase="question"; st.session_state.q_start=None
-            st.rerun()
+            st.experimental_rerun()
         st.stop()
 
 
@@ -227,24 +228,17 @@ if i<total_q:
         sel=st.radio(q["prompt"],list(sel_map.keys()),index=None,key=f"radio{i}")
         if sel: finish(sel_map[sel])
     else:
-        col_input,col_btn=st.columns([4,1])
-        with col_input:
-            txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
-            # мгновенная валидация
-            if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
-                st.error("Допустимы только русские буквы и знаки пунктуации.")
-        with col_btn:
-            if st.button("Ответить",key=f"submit{i}",use_container_width=True):
-                if not txt:
-                    st.warning("Введите ответ или нажмите «Не вижу букв».")
-                elif not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
-                    st.error("Исправьте ответ — только русские буквы и знаки пунктуации.")
-                else:
-                    finish(txt.strip())
-        st.button("Не вижу букв",key=f"skip{i}",use_container_width=True,on_click=lambda:finish("Не вижу"))
+        txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
+        if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+            finish(txt.strip())
+        elif txt:
+            st.error("Допустимы только русские буквы и знаки пунктуации.")
+        skip_pressed=st.button("Не вижу букв",use_container_width=True,key=f"skip{i}")
+        if skip_pressed: finish("Не вижу")
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
+
 
 
 
