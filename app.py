@@ -27,6 +27,10 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
   align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;
   text-align:center;padding:0 20px;}
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
+
+/* зелёная / красная кнопки */
+div[data-testid="stButton"][id*="submit"] button{background:#2d6a4f!important;}
+div[data-testid="stButton"][id*="skip"]   button{background:#8d0801!important;}
 </style>
 <div id="mobile-overlay">
   Уважаемый&nbsp;участник,<br>
@@ -36,10 +40,8 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
 
 @st.cache_resource(show_spinner="…")
 def get_sheet() -> gspread.Worksheet:
-    scopes = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
+    scopes = ["https://spreadsheets.google.com/feeds",
+              "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["gsp"])
     gc = gspread.authorize(
         ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
@@ -84,24 +86,30 @@ LETTER_ANS = {
 
 def file_url(g:str,a:str)->str: return f"{BASE_URL}/{g}_{a}.png"
 
+
 def make_questions() -> List[Dict]:
-    pool=[]
+    per_group={g:[] for g in GROUPS}
     for g,a in itertools.product(GROUPS,ALGS):
-        pool.append(dict(group=g,alg=a,img=file_url(g,a),qtype="corners",
-                         prompt="Правый верхний и левый нижний угол — одного цвета?",
-                         correct=CORNER_ANS[g]))
-        pool.append(dict(group=g,alg=a,img=file_url(g,a),qtype="letters",
-                         prompt="Если на изображении вы видите буквы, то укажите, какие именно.",
-                         correct=LETTER_ANS[g]))
-    random.seed()
-    buckets={g:[] for g in GROUPS}
-    for c in pool: buckets[c["group"]].append(c)
-    for b in buckets.values(): random.shuffle(b)
-    ordered=[]; prev=None
-    while any(buckets.values()):
-        avail=[g for g,l in buckets.items() if l and g!=prev] or [g for g,l in buckets.items() if l]
-        g=random.choice(avail); ordered.append(buckets[g].pop()); prev=g
-    for n,q in enumerate(ordered,1): q["№"]=n
+        per_group[g].append(dict(group=g,alg=a,img=file_url(g,a),
+                                 qtype="corners",
+                                 prompt="Правый верхний и левый нижний угол — одного цвета?",
+                                 correct=CORNER_ANS[g]))
+        per_group[g].append(dict(group=g,alg=a,img=file_url(g,a),
+                                 qtype="letters",
+                                 prompt="Если на изображении вы видите буквы, то укажите, какие именно.",
+                                 correct=LETTER_ANS[g]))
+    for lst in per_group.values():
+        random.shuffle(lst)
+
+    ordered=[]
+    while any(per_group.values()):
+        cycle=list(GROUPS)
+        random.shuffle(cycle)
+        for g in cycle:
+            if per_group[g]:
+                ordered.append(per_group[g].pop())
+    for n,q in enumerate(ordered,1):
+        q["№"]=n
     return ordered
 
 if "questions" not in st.session_state:
@@ -114,7 +122,6 @@ if st.session_state.get("blank_until",0)>time.time():
     st_autorefresh(interval=250,key="blank"); st.stop()
 elif "blank_until" in st.session_state:
     del st.session_state["blank_until"]
-
 
 if not st.session_state.name:
     st.markdown("""
@@ -143,9 +150,9 @@ if not st.session_state.name:
     if uname: st.session_state.name=uname.strip(); st.experimental_rerun()
     st.stop()
 
+
 def letters_set(s:str)->set[str]:
-    s=re.sub(r"[ ,.;:-]+","",s.lower())
-    return set(s)
+    return set(re.sub(r"[ ,.;:-]+","",s.lower()))
 
 def finish(ans:str):
     q=qs[st.session_state.idx]
@@ -161,10 +168,10 @@ def finish(ans:str):
     st.session_state.q_start=None; st.session_state.blank_until=time.time()+1.0
     st.experimental_rerun()
 
+
 i=st.session_state.idx
 if i<total_q:
     q=qs[i]
-
 
     intro_limit = 8 if i<5 else 2
     if st.session_state.phase=="intro":
@@ -197,7 +204,6 @@ if i<total_q:
             st.experimental_rerun()
         st.stop()
 
-
     if st.session_state.q_start is None:
         st.session_state.q_start=time.time()
     elapsed_q=time.time()-st.session_state.q_start
@@ -229,15 +235,20 @@ if i<total_q:
         if sel: finish(sel_map[sel])
     else:
         txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
-        if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
-            finish(txt.strip())
-        elif txt:
+        if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
             st.error("Допустимы только русские буквы и знаки пунктуации.")
-        skip_pressed=st.button("Не вижу букв",key=f"skip{i}")  # компактная кнопка
-        if skip_pressed: finish("Не вижу")
+        col_sub,col_skip=st.columns([1,1])
+        if col_sub.button("Ответить",key=f"submit{i}") and txt:
+            if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+                finish(txt.strip())
+            else:
+                st.error("Исправьте ответ — только русские буквы и знаки пунктуации.")
+        if col_skip.button("Не вижу букв",key=f"skip{i}"):
+            finish("Не вижу")
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
+
 
 
 
