@@ -17,75 +17,32 @@ html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
 h1,h2,h3,h4,h5,h6{color:#111!important;}
 .question-card,* .question-card{color:#fff!important;}
 .stButton>button{color:#fff!important;}
-header[data-testid="stHeader"],div[data-testid="stHeader"]{display:none;}
-.question-card{background:transparent!important;border:none!important;}
 input[data-testid="stTextInput"]{
   height:52px!important;padding:0 16px!important;font-size:1.05rem;}
-.stButton>button{
-  min-height:104px!important;padding:0 20px!important;border:1px solid #555!important;
-  background:#222!important;color:#ddd!important;border-radius:8px;}
 
-div[data-testid="column"] {
-    padding: 0 5px !important;
-}
-
-div[data-testid="column"] > div {
-    padding: 0 !important;
-}
+div[data-testid="column"]{padding:0 5px!important;}
+div[data-testid="column"]>div{padding:0!important;}
 
 #mobile-overlay{position:fixed;inset:0;z-index:9999;background:#808080;display:none;
   align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;
   text-align:center;padding:0 20px;}
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
 
-button[data-testid="baseButton-secondary"],
-button[data-testid="baseButton-primary"]{
-  min-width:180px!important;    
-  height:96px!important;          
+.stButton>button{
+  min-width:180px!important; 
+  min-height:96px!important; 
   font-size:1.25rem!important;
   font-weight:700!important;
+  padding:0 24px!important;
   border-radius:8px!important;
+  margin:0 6px!important;    
 }
 
-
-.custom-buttons {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
+button:has(> span:contains("Не вижу букв")){
+  background:#8d0801!important;border-color:#8d0801!important;color:#fff!important;
 }
-
-.custom-btn {
-    flex: 1;
-    min-height: 104px;
-    padding: 0 20px;
-    border: 1px solid;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-submit {
-    background: #2d6a4f !important;
-    border-color: #2d6a4f !important;
-    color: white !important;
-}
-
-.btn-submit:hover {
-    background: #25593f !important;
-    border-color: #25593f !important;
-}
-
-.btn-skip {
-    background: #8d0801 !important;
-    border-color: #8d0801 !important;
-    color: white !important;
-}
-
-.btn-skip:hover {
-    background: #7a0701 !important;
-    border-color: #7a0701 !important;
+button:has(> span:contains("Ответить")){
+  background:#2d6a4f!important;border-color:#2d6a4f!important;color:#fff!important;
 }
 </style>
 <div id="mobile-overlay">
