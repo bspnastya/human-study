@@ -158,7 +158,7 @@ def finish(ans:str):
     st.session_state.idx+=1
     st.session_state.phase="intro"; st.session_state.intro_start=None
     st.session_state.q_start=None; st.session_state.blank_until=time.time()+1.0
-    st.experimental_rerun()
+    st.rerun()
 
 i=st.session_state.idx
 if i<total_q:
@@ -193,7 +193,7 @@ if i<total_q:
         st.markdown(f"**Начало показа через&nbsp;{left_intro} с**")
         if elapsed>=intro_limit:
             st.session_state.phase="question"; st.session_state.q_start=None
-            st.experimental_rerun()
+            st.rerun()
         st.stop()
 
 
