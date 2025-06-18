@@ -223,7 +223,7 @@ if i<total_q:
     if q["qtype"]=="corners":
         sel_map={"Да, углы одного цвета.":"да",
                  "Нет, углы окрашены в разные цвета.":"нет",
-                 "Затрудняюсь ответить":"затрудняюсь"}
+                 "Затрудняюсь ответить.":"затрудняюсь"}
         sel=st.radio(q["prompt"],list(sel_map.keys()),index=None,key=f"radio{i}")
         if sel: finish(sel_map[sel])
     else:
