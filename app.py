@@ -38,7 +38,16 @@ div[data-testid="column"] > div {
   text-align:center;padding:0 20px;}
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
 
-/* Стили для HTML кнопок */
+button[data-testid="baseButton-secondary"],
+button[data-testid="baseButton-primary"]{
+  min-width:180px!important;    
+  height:96px!important;          
+  font-size:1.25rem!important;
+  font-weight:700!important;
+  border-radius:8px!important;
+}
+
+
 .custom-buttons {
     display: flex;
     gap: 8px;
