@@ -24,12 +24,12 @@ h1,h2,h3,h4,h5,h6{color:#111!important;}
 .stButton>button{
   color:#fff!important;
   min-height:52px!important;
-  padding:0 28px!important;      /* <- больше воздуха слева/справа */
+  padding:0 24px!important; 
   border:1px solid #555!important;
   background:#222!important;
   color:#ddd!important;
   border-radius:8px;
-  white-space:nowrap;            /* <- не переносить текст внутри */
+  white-space:nowrap;          
 }
 
 header[data-testid="stHeader"],div[data-testid="stHeader"]{display:none;}
