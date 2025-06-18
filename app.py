@@ -24,7 +24,7 @@ h1,h2,h3,h4,h5,h6{color:#111!important;}
 .stButton>button{
   color:#fff!important;
   min-height:52px!important;
-  padding:0 24px!important; 
+  padding:0 28px!important; 
   border:1px solid #555!important;
   background:#222!important;
   color:#ddd!important;
