@@ -348,7 +348,13 @@ if i < total_q:
             finish(txt.strip())
 
 else:
-    st.success("Вы завершили прохождение. Спасибо за участие!")
+   
+    st.markdown("""
+    <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
+                 color:#fff;background:#262626;border-radius:12px;">
+        Вы завершили прохождение.<br><b>Спасибо за участие!</b>
+    </div>
+    """, unsafe_allow_html=True)
     st.balloons()
 
 
