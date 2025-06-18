@@ -57,7 +57,7 @@ def get_sheet() -> gspread.Worksheet:
 try:
     SHEET = get_sheet()
 except Exception:
-    SHEET = None 
+    SHEET = None
 
 log_q: queue.Queue[List] = queue.Queue()
 
@@ -77,8 +77,8 @@ threading.Thread(target=_writer, daemon=True).start()
 
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 15          
-INTRO_TIME = 8        
+TIME_LIMIT = 15       
+INTRO_TIME = 8          
 
 GROUPS = [
     "img1_dif_corners",
@@ -242,12 +242,10 @@ def finish(ans: str):
     st.experimental_rerun()
 
 
-
 i = st.session_state.idx
 if i < total_q:
     q = qs[i]
 
-   
     intro_limit = 8 if i < 5 else 2
     if st.session_state.phase == "intro":
         if st.session_state.intro_start is None:
@@ -286,7 +284,6 @@ if i < total_q:
             st.experimental_rerun()
         st.stop()
 
-
     if st.session_state.q_start is None:
         st.session_state.q_start = time.time()
     elapsed_q = time.time() - st.session_state.q_start
@@ -320,6 +317,7 @@ if i < total_q:
     else:
         st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
 
+    # ----------  БЛОК ОТВЕТА ДЛЯ qtype == "corners"  ----------
     if q["qtype"] == "corners":
         sel = st.radio(
             q["prompt"],
@@ -338,24 +336,53 @@ if i < total_q:
                 finish("нет")
             else:
                 finish("затрудняюсь")
+
+ 
     else:
-        txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
-        if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-            st.error("Допустимы только русские буквы и знаки пунктуации.")
-        if st.button("Не вижу букв", key=f"skip{i}"):
+        # Располагаем поле ввода + кнопку «Ответить» в одной строке
+        col1, col2 = st.columns([9, 1])  # 9/10 ширины поле, 1/10 кнопка
+        with col1:
+            txt = st.text_input(
+                q["prompt"],
+                key=f"in{i}",
+                placeholder="Введите русские буквы",
+                label_visibility="collapsed",
+            )
+        with col2:
+            send_clicked = st.button(
+                "Ответить",
+                key=f"send{i}",
+                type="primary",
+                use_container_width=True,
+            )
+
+ 
+        skip_clicked = st.button("Не вижу букв", key=f"skip{i}")
+
+
+        if send_clicked:
+            if not txt:
+                st.error("Сначала введите ответ или нажмите «Не вижу букв».")
+            elif not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+                st.error("Допустимы только русские буквы и знаки пунктуации.")
+            else:
+                finish(txt.strip())
+        if skip_clicked:
             finish("Не вижу")
-        if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-            finish(txt.strip())
 
 else:
-   
-    st.markdown("""
+ 
+    st.markdown(
+        """
     <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
                  color:#fff;background:#262626;border-radius:12px;">
         Вы завершили прохождение.<br><b>Спасибо за участие!</b>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
     st.balloons()
+
 
 
 
