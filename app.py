@@ -26,7 +26,7 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
                                  font-size:1.05rem;}
 .stButton>button{min-height:52px!important;padding:0 20px!important;
                  border:1px solid #555!important;background:#222!important;
-                 color:#ddd!important;border-radius:8px;}
+                 color:#ddd!important;border-radius:8px;white-space: nowrap;}
 #mobile-overlay{position:fixed;inset:0;z-index:9999;background:#808080;display:none;
   align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;
   text-align:center;padding:0 20px;}
