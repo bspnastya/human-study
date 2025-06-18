@@ -1,6 +1,6 @@
 from __future__ import annotations
 from streamlit_autorefresh import st_autorefresh
-import random, time, datetime, secrets, threading, queue, re, itertools, json
+import random, time, datetime, secrets, threading, queue, re, itertools
 from typing import List, Dict
 import streamlit as st, streamlit.components.v1 as components
 import gspread
@@ -10,6 +10,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 st.set_page_config(page_title="Визуализация многоканальных изображений",
                    page_icon="🎯", layout="centered",
                    initial_sidebar_state="collapsed")
+
 st.markdown("""<style>
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
@@ -18,47 +19,44 @@ h1,h2,h3,h4,h5,h6{color:#111!important;}
 .stButton>button{color:#fff!important;}
 header[data-testid="stHeader"],div[data-testid="stHeader"]{display:none;}
 .question-card{background:transparent!important;border:none!important;}
-input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
-                                 font-size:1.05rem;}
-.stButton>button{min-height:52px!important;padding:0 20px!important;
-                 border:1px solid #555!important;background:#222!important;
-                 color:#ddd!important;border-radius:8px;}
+input[data-testid="stTextInput"]{
+  height:52px!important;padding:0 16px!important;font-size:1.05rem;}
+.stButton>button{
+  min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;
+  background:#222!important;color:#ddd!important;border-radius:8px;}
+
+div[id^="submit"] button{background:#2d6a4f!important;}  
+div[id^="skip"]   button{background:#8d0801!important;}  
+
 #mobile-overlay{position:fixed;inset:0;z-index:9999;background:#808080;display:none;
   align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;
   text-align:center;padding:0 20px;}
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
-
-/* зелёная / красная кнопки */
-div[data-testid="stButton"][id*="submit"] button{background:#2d6a4f!important;}
-div[data-testid="stButton"][id*="skip"]   button{background:#8d0801!important;}
 </style>
 <div id="mobile-overlay">
   Уважаемый&nbsp;участник,<br>
   данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>""", unsafe_allow_html=True)
 
-
 @st.cache_resource(show_spinner="…")
 def get_sheet() -> gspread.Worksheet:
     scopes = ["https://spreadsheets.google.com/feeds",
               "https://www.googleapis.com/auth/drive"]
-    creds_dict = dict(st.secrets["gsp"])
     gc = gspread.authorize(
-        ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
-    )
+        ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gsp"]),
+                                                         scopes))
     return gc.open("human_study_results").sheet1
 try:
     SHEET = get_sheet()
 except Exception:
     SHEET = None
 
-log_q: queue.Queue[List] = queue.Queue()
+log_q: "queue.Queue[list]" = queue.Queue()
 def _writer():
     while True:
         row = log_q.get()
         try:
-            if SHEET:
-                SHEET.append_row(row)
+            if SHEET: SHEET.append_row(row)
         except Exception as e:
             print("Sheets error:", e)
         log_q.task_done()
@@ -66,7 +64,7 @@ threading.Thread(target=_writer, daemon=True).start()
 
 
 BASE_URL   = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 15        
+TIME_LIMIT = 15       
 
 GROUPS = [
     "img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
@@ -86,7 +84,6 @@ LETTER_ANS = {
 
 def file_url(g:str,a:str)->str: return f"{BASE_URL}/{g}_{a}.png"
 
-
 def make_questions() -> List[Dict]:
     per_group={g:[] for g in GROUPS}
     for g,a in itertools.product(GROUPS,ALGS):
@@ -98,23 +95,21 @@ def make_questions() -> List[Dict]:
                                  qtype="letters",
                                  prompt="Если на изображении вы видите буквы, то укажите, какие именно.",
                                  correct=LETTER_ANS[g]))
-    for lst in per_group.values():
-        random.shuffle(lst)
+    for v in per_group.values(): random.shuffle(v)
 
     ordered=[]
     while any(per_group.values()):
-        cycle=list(GROUPS)
-        random.shuffle(cycle)
+        cycle=list(GROUPS); random.shuffle(cycle)
         for g in cycle:
             if per_group[g]:
                 ordered.append(per_group[g].pop())
-    for n,q in enumerate(ordered,1):
-        q["№"]=n
+    for n,q in enumerate(ordered,1): q["№"]=n
     return ordered
 
 if "questions" not in st.session_state:
-    st.session_state.update(questions=make_questions(), idx=0, name="",
-                            q_start=None, phase="intro", intro_start=None)
+    st.session_state.update(questions=make_questions(), idx=0,
+                            name="", q_start=None,
+                            phase="intro", intro_start=None)
 qs=st.session_state.questions; total_q=len(qs)
 
 
@@ -124,8 +119,7 @@ elif "blank_until" in st.session_state:
     del st.session_state["blank_until"]
 
 if not st.session_state.name:
-    st.markdown("""
-<div style="color:#111;">
+    st.markdown("""<div style="color:#111;">
   <h2>Уважаемый участник,<br>добро пожаловать в эксперимент по изучению восприятия изображений.</h2>
   <p><b>Как проходит эксперимент</b><br>
      В ходе эксперимента вам нужно будет отвечать на простые вопросы об изображениях, 
@@ -141,8 +135,7 @@ if not st.session_state.name:
      использование телефонов или планшетов запрещено.</p>
   <p>Для начала теста введите любой псевдоним и нажмите Enter  
      или нажмите «Сгенерировать псевдоним».</p>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
     uname=st.text_input("",placeholder="Фамилия / псевдоним",
                         key="username",label_visibility="collapsed")
     if st.button("🎲 Сгенерировать псевдоним"):
@@ -167,7 +160,6 @@ def finish(ans:str):
     st.session_state.phase="intro"; st.session_state.intro_start=None
     st.session_state.q_start=None; st.session_state.blank_until=time.time()+1.0
     st.experimental_rerun()
-
 
 i=st.session_state.idx
 if i<total_q:
@@ -204,6 +196,7 @@ if i<total_q:
             st.experimental_rerun()
         st.stop()
 
+  
     if st.session_state.q_start is None:
         st.session_state.q_start=time.time()
     elapsed_q=time.time()-st.session_state.q_start
@@ -237,7 +230,8 @@ if i<total_q:
         txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
         if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
             st.error("Допустимы только русские буквы и знаки пунктуации.")
-        col_sub,col_skip=st.columns([1,1])
+
+        col_sub, gap, col_skip = st.columns([1,0.08,1])
         if col_sub.button("Ответить",key=f"submit{i}") and txt:
             if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
                 finish(txt.strip())
@@ -248,6 +242,7 @@ if i<total_q:
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
+
 
 
 
