@@ -22,7 +22,7 @@ header[data-testid="stHeader"],div[data-testid="stHeader"]{display:none;}
 input[data-testid="stTextInput"]{
   height:52px!important;padding:0 16px!important;font-size:1.05rem;}
 .stButton>button{
-  min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;
+  min-height:104px!important;padding:0 20px!important;border:1px solid #555!important;
   background:#222!important;color:#ddd!important;border-radius:8px;}
 
 div[data-testid="column"] {
