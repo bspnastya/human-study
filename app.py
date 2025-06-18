@@ -23,7 +23,6 @@ header[data-testid="stHeader"],div[data-testid="stHeader"]{display:none;}
 input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;font-size:1.05rem;}
 .stButton>button{min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;
                  background:#222!important;color:#ddd!important;border-radius:8px;}
-
 div[data-testid="stButton"][id*="skip"] button{background:#8d0801!important;border:1px solid #8d0801!important;}
 div[data-testid="stButton"][id*="skip"] button:hover{background:#7a0701!important;}
 #mobile-overlay{position:fixed;inset:0;z-index:9999;background:#808080;display:none;
@@ -35,6 +34,7 @@ div[data-testid="stButton"][id*="skip"] button:hover{background:#7a0701!importan
   Уважаемый&nbsp;участник,<br>
   данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>""", unsafe_allow_html=True)
+
 
 @st.cache_resource(show_spinner="…")
 def get_sheet()->gspread.Worksheet:
@@ -109,8 +109,7 @@ if not st.session_state.name:
      использование телефонов или планшетов запрещено.</p>
   <p>Для начала теста введите любой псевдоним и нажмите Enter  
      или нажмите «Сгенерировать псевдоним».</p>
-</div>
-""",unsafe_allow_html=True)
+</div>""",unsafe_allow_html=True)
     uname=st.text_input("",placeholder="Фамилия / псевдоним",key="username",label_visibility="collapsed")
     if st.button("🎲 Сгенерировать псевдоним"): st.session_state.name=f"Участник_{secrets.randbelow(900_000)+100_000}"; st.experimental_rerun()
     if uname: st.session_state.name=uname.strip(); st.experimental_rerun()
@@ -136,13 +135,43 @@ if i<total_q:
     intro_limit=8 if i<5 else 2
     if st.session_state.phase=="intro":
         if st.session_state.intro_start is None: st.session_state.intro_start=time.time()
-        if time.time()-st.session_state.intro_start>=intro_limit:
-            st.session_state.phase="question"; st.experimental_rerun()
+        elapsed=time.time()-st.session_state.intro_start
+        left_intro=max(int(intro_limit-elapsed),0)
+        st_autorefresh(interval=500,key=f"intro{i}")
+
+        if q["qtype"]=="corners":
+            st.markdown("""
+            <div style="font-size:1.1rem;">
+            Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
+            диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
+            и определить, окрашены ли они в один цвет.<br><br>
+            Картинка будет доступна в течение <b>15&nbsp;секунд</b>. Время на ответ не ограничено.
+            </div>""",unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="font-size:1.1rem;">
+            Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
+            представленной картинке <b>буквы русского алфавита</b>.
+            Найденные буквы необходимо ввести в текстовое поле: допускается разделение
+            пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>
+            На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.
+            </div>""",unsafe_allow_html=True)
+        st.markdown(f"**Начало показа через&nbsp;{left_intro} с**")
+        if elapsed>=intro_limit:
+            st.session_state.phase="question"; st.session_state.q_start=None; st.experimental_rerun()
         st.stop()
 
     if st.session_state.q_start is None: st.session_state.q_start=time.time()
     left=max(TIME_LIMIT-int(time.time()-st.session_state.q_start),0)
     st_autorefresh(interval=1000,key=f"q{i}")
+
+    components.html(f"""<div style="display:flex;gap:16px;height:70px">
+      <div style="position:relative;width:70px;height:70px">
+        <svg width="70" height="70"><circle cx="35" cy="35" r="26" stroke="#444" stroke-width="6" fill="none"/>
+        <circle cx="35" cy="35" r="26" stroke="#52b788" stroke-width="6" fill="none"
+        stroke-dasharray="163.36" stroke-dashoffset="{163.36*(left/15)}" transform="rotate(-90 35 35)"/></svg>
+        <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+        font:700 1.2rem sans-serif;color:#52b788">{left}</span></div></div>""",height=80)
 
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
     if left>0: st.image(q["img"],width=290,clamp=True)
@@ -156,11 +185,11 @@ if i<total_q:
         txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
         if txt and not re.fullmatch(letters_re,txt): st.error("Допустимы только русские буквы и знаки пунктуации.")
         if st.button("Не вижу букв",key=f"skip{i}"): finish("Не вижу")
-      
         if txt and re.fullmatch(letters_re,txt): finish(txt.strip())
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
+
 
 
 
