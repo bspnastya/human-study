@@ -64,7 +64,7 @@ threading.Thread(target=_writer, daemon=True).start()
 
 
 BASE_URL   = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 15 
+TIME_LIMIT = 15        
 
 GROUPS = [
     "img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
@@ -233,11 +233,12 @@ if i<total_q:
             finish(txt.strip())
         elif txt:
             st.error("Допустимы только русские буквы и знаки пунктуации.")
-        skip_pressed=st.button("Не вижу букв",use_container_width=True,key=f"skip{i}")
+        skip_pressed=st.button("Не вижу букв",key=f"skip{i}")  # компактная кнопка
         if skip_pressed: finish("Не вижу")
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
+
 
 
 
