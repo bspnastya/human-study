@@ -19,14 +19,23 @@ html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
 h1,h2,h3,h4,h5,h6{color:#111!important;}
 .question-card,* .question-card{color:#fff!important;}
-.stButton>button{color:#fff!important;}
+
+/* общий стиль всех кнопок Streamlit */
+.stButton>button{
+  color:#fff!important;
+  min-height:52px!important;
+  padding:0 28px!important;      /* <- больше воздуха слева/справа */
+  border:1px solid #555!important;
+  background:#222!important;
+  color:#ddd!important;
+  border-radius:8px;
+  white-space:nowrap;            /* <- не переносить текст внутри */
+}
+
 header[data-testid="stHeader"],div[data-testid="stHeader"]{display:none;}
 .question-card{background:transparent!important;border:none!important;}
 input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
                                  font-size:1.05rem;}
-.stButton>button{min-height:52px!important;padding:0 20px!important;
-                 border:1px solid #555!important;background:#222!important;
-                 color:#ddd!important;border-radius:8px;white-space: nowrap;}
 #mobile-overlay{position:fixed;inset:0;z-index:9999;background:#808080;display:none;
   align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;
   text-align:center;padding:0 20px;}
@@ -39,7 +48,6 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
 """,
     unsafe_allow_html=True,
 )
-
 
 @st.cache_resource(show_spinner="…")
 def get_sheet() -> gspread.Worksheet:
@@ -75,10 +83,9 @@ def _writer():
 
 threading.Thread(target=_writer, daemon=True).start()
 
-
-BASE_URL  = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 15      
-INTRO_TIME = 8          
+BASE_URL   = "https://storage.yandexcloud.net/test3123234442"
+TIME_LIMIT = 15
+INTRO_TIME = 8
 
 GROUPS = [
     "img1_dif_corners",
@@ -107,6 +114,7 @@ LETTER_ANS = {
     "img4_same_corners": "аб",
     "img5_same_corners": "юэы",
 }
+
 
 def file_url(g: str, a: str) -> str:
     return f"{BASE_URL}/{g}_{a}.png"
@@ -149,7 +157,6 @@ def make_questions() -> List[Dict]:
         q["№"] = n
     return ordered
 
-
 if "questions" not in st.session_state:
     st.session_state.update(
         questions=make_questions(),
@@ -160,9 +167,8 @@ if "questions" not in st.session_state:
         intro_start=None,
     )
 
-qs        = st.session_state.questions
-total_q   = len(qs)
-
+qs       = st.session_state.questions
+total_q  = len(qs)
 
 if not st.session_state.name:
     st.markdown(
@@ -277,7 +283,7 @@ if i < total_q:
             st.experimental_rerun()
         st.stop()
 
- 
+
     if st.session_state.q_start is None:
         st.session_state.q_start = time.time()
     elapsed_q = time.time() - st.session_state.q_start
@@ -312,7 +318,7 @@ if i < total_q:
     else:
         st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
 
-
+   
     if q["qtype"] == "corners":
         sel = st.radio(
             q["prompt"],
@@ -327,34 +333,31 @@ if i < total_q:
         if sel:
             finish({"Да": "да", "Нет": "нет", "Затрудняюсь": "затрудняюсь"}[sel.split(",")[0]])
 
-  
-    else:
 
+    else:
         txt = st.text_input(
             q["prompt"],
             key=f"in{i}",
             placeholder="Введите русские буквы",
         )
 
-       
-        colA, colB, colC = st.columns([1, 1, 5])  # третья колонка — «буфер» для смещения
+        colA, colB, colC = st.columns([2, 2, 3])
         with colA:
-            skip_clicked = st.button(
-                "Не вижу букв",
-                key=f"skip{i}",
-                type="secondary",
-                use_container_width=True,
-            )
-        with colB:
             send_clicked = st.button(
                 "Ответить",
                 key=f"send{i}",
                 type="primary",
                 use_container_width=True,
             )
-        # colC остаётся пустой
+        with colB:
+            skip_clicked = st.button(
+                "Не вижу букв",
+                key=f"skip{i}",
+                type="secondary",
+                use_container_width=True,
+            )
+      
 
-       
         if skip_clicked:
             finish("Не вижу")
         if send_clicked:
@@ -365,13 +368,12 @@ if i < total_q:
             else:
                 finish(txt.strip())
 
- 
+
         if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt) and not send_clicked:
-            # если нажали Enter (без клика кнопки) — тоже завершаем
             finish(txt.strip())
 
 else:
-  
+
     st.markdown(
         """
     <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
@@ -382,20 +384,3 @@ else:
         unsafe_allow_html=True,
     )
     st.balloons()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
