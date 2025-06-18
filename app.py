@@ -19,19 +19,19 @@ html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
 h1,h2,h3,h4,h5,h6{color:#111!important;}
 .question-card,* .question-card{color:#fff!important;}
-
-/* общий стиль всех кнопок Streamlit */
 .stButton>button{
   color:#fff!important;
   min-height:52px!important;
-  padding:0 28px!important; 
+  padding:0 28px!important;
   border:1px solid #555!important;
   background:#222!important;
   color:#ddd!important;
   border-radius:8px;
-  white-space:nowrap;          
+  white-space:nowrap;
 }
-
+.letters-zone .stButton>button{
+  padding:0 16px!important;
+}
 header[data-testid="stHeader"],div[data-testid="stHeader"]{display:none;}
 .question-card{background:transparent!important;border:none!important;}
 input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
@@ -61,14 +61,12 @@ def get_sheet() -> gspread.Worksheet:
     )
     return gc.open("human_study_results").sheet1
 
-
 try:
     SHEET = get_sheet()
 except Exception:
     SHEET = None
 
 log_q: queue.Queue[List] = queue.Queue()
-
 
 def _writer():
     while True:
@@ -79,7 +77,6 @@ def _writer():
         except Exception as e:
             print("Sheets error:", e)
         log_q.task_done()
-
 
 threading.Thread(target=_writer, daemon=True).start()
 
@@ -115,10 +112,8 @@ LETTER_ANS = {
     "img5_same_corners": "юэы",
 }
 
-
 def file_url(g: str, a: str) -> str:
     return f"{BASE_URL}/{g}_{a}.png"
-
 
 def make_questions() -> List[Dict]:
     per_group: dict[str, list] = {g: [] for g in GROUPS}
@@ -145,7 +140,6 @@ def make_questions() -> List[Dict]:
         )
     for lst in per_group.values():
         random.shuffle(lst)
-
     ordered = []
     while any(per_group.values()):
         cycle = list(GROUPS)
@@ -204,10 +198,8 @@ if not st.session_state.name:
         st.experimental_rerun()
     st.stop()
 
-
 def letters_set(s: str) -> set[str]:
     return set(re.sub(r"[ ,.;:-]+", "", s.lower()))
-
 
 def finish(ans: str):
     q  = qs[st.session_state.idx]
@@ -240,11 +232,9 @@ def finish(ans: str):
     st.session_state.q_start    = None
     st.experimental_rerun()
 
-
 i = st.session_state.idx
 if i < total_q:
     q = qs[i]
-
     intro_limit = 8 if i < 5 else 2
     if st.session_state.phase == "intro":
         if st.session_state.intro_start is None:
@@ -252,7 +242,6 @@ if i < total_q:
         elapsed = time.time() - st.session_state.intro_start
         left_intro = max(int(intro_limit - elapsed), 0)
         st_autorefresh(interval=500, key=f"intro{i}")
-
         if q["qtype"] == "corners":
             st.markdown(
                 """
@@ -283,13 +272,11 @@ if i < total_q:
             st.experimental_rerun()
         st.stop()
 
-
     if st.session_state.q_start is None:
         st.session_state.q_start = time.time()
     elapsed_q = time.time() - st.session_state.q_start
     left      = max(TIME_LIMIT - int(elapsed_q), 0)
     st_autorefresh(interval=1000, key=f"q{i}")
-
 
     components.html(
         f"""
@@ -318,7 +305,6 @@ if i < total_q:
     else:
         st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
 
-   
     if q["qtype"] == "corners":
         sel = st.radio(
             q["prompt"],
@@ -333,13 +319,14 @@ if i < total_q:
         if sel:
             finish({"Да": "да", "Нет": "нет", "Затрудняюсь": "затрудняюсь"}[sel.split(",")[0]])
 
-
     else:
         txt = st.text_input(
             q["prompt"],
             key=f"in{i}",
             placeholder="Введите русские буквы",
         )
+
+        st.markdown('<div class="letters-zone">', unsafe_allow_html=True)
 
         colA, colB, colC = st.columns([2, 2, 3])
         with colA:
@@ -356,7 +343,8 @@ if i < total_q:
                 type="secondary",
                 use_container_width=True,
             )
-      
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
         if skip_clicked:
             finish("Не вижу")
@@ -367,13 +355,10 @@ if i < total_q:
                 st.error("Допустимы только русские буквы и знаки пунктуации.")
             else:
                 finish(txt.strip())
-
-
         if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt) and not send_clicked:
             finish(txt.strip())
 
 else:
-
     st.markdown(
         """
     <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
@@ -384,3 +369,4 @@ else:
         unsafe_allow_html=True,
     )
     st.balloons()
+
