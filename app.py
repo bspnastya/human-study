@@ -47,7 +47,7 @@ div[data-testid="column"] > div {
 
 .custom-btn {
     flex: 1;
-    min-height: 52px;
+    min-height: 104px;
     padding: 0 20px;
     border: 1px solid;
     border-radius: 8px;
