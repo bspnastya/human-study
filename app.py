@@ -17,7 +17,7 @@ html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
 h1,h2,h3,h4,h5,h6{color:#111!important;}
 .question-card,* .question-card{color:#fff!important;}
-/* штатные streamlit-кнопки – оставляем как есть */
+
 .stButton>button{
   min-height:52px!important;padding:0 20px!important;border-radius:8px;
   border:1px solid #555!important;background:#222!important;color:#ddd!important;}
