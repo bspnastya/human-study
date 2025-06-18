@@ -63,28 +63,22 @@ threading.Thread(target=_writer,daemon=True).start()
 
 
 BASE_URL   = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 15       
-INTRO_TIME = 8        
+TIME_LIMIT = 15      
 
-GROUPS = [               
+GROUPS = [
     "img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
     "img4_same_corners","img5_same_corners"
 ]
 ALGS = ["pca_rgb_result","socolov_lab_result","socolov_rgb_result","umap_rgb_result"]
 
 CORNER_ANS = {
-    "img1_dif_corners":"нет",
-    "img2_dif_corners":"нет",
-    "img3_same_corners_no_symb":"да",
-    "img4_same_corners":"да",
-    "img5_same_corners":"да",
+    "img1_dif_corners":"нет","img2_dif_corners":"нет",
+    "img3_same_corners_no_symb":"да","img4_same_corners":"да","img5_same_corners":"да",
 }
 LETTER_ANS = {
-    "img1_dif_corners":"ж",
-    "img2_dif_corners":"фя",
+    "img1_dif_corners":"ж","img2_dif_corners":"фя",
     "img3_same_corners_no_symb":"Не вижу",
-    "img4_same_corners":"аб",
-    "img5_same_corners":"юэы",
+    "img4_same_corners":"аб","img5_same_corners":"юэы",
 }
 
 def file_url(g:str,a:str)->str: return f"{BASE_URL}/{g}_{a}.png"
@@ -92,12 +86,10 @@ def file_url(g:str,a:str)->str: return f"{BASE_URL}/{g}_{a}.png"
 def make_questions() -> List[Dict]:
     pool=[]
     for g,a in itertools.product(GROUPS,ALGS):
-        pool.append(dict(group=g,alg=a,img=file_url(g,a),
-                         qtype="corners",
+        pool.append(dict(group=g,alg=a,img=file_url(g,a),qtype="corners",
                          prompt="Правый верхний и левый нижний угол — одного цвета?",
                          correct=CORNER_ANS[g]))
-        pool.append(dict(group=g,alg=a,img=file_url(g,a),
-                         qtype="letters",
+        pool.append(dict(group=g,alg=a,img=file_url(g,a),qtype="letters",
                          prompt="Если на изображении вы видите буквы, то укажите, какие именно.",
                          correct=LETTER_ANS[g]))
     random.seed()
@@ -107,14 +99,13 @@ def make_questions() -> List[Dict]:
     ordered=[]; prev=None
     while any(buckets.values()):
         avail=[g for g,l in buckets.items() if l and g!=prev] or [g for g,l in buckets.items() if l]
-        g=random.choice(avail)
-        ordered.append(buckets[g].pop()); prev=g
+        g=random.choice(avail); ordered.append(buckets[g].pop()); prev=g
     for n,q in enumerate(ordered,1): q["№"]=n
     return ordered
 
 if "questions" not in st.session_state:
-    st.session_state.update(questions=make_questions(), idx=0, name="", q_start=None,
-                            phase="intro", intro_start=None)
+    st.session_state.update(questions=make_questions(), idx=0, name="",
+                            q_start=None, phase="intro", intro_start=None)
 qs=st.session_state.questions; total_q=len(qs)
 
 
@@ -155,7 +146,6 @@ def letters_set(s:str)->set[str]:
     s=re.sub(r"[ ,.;:-]+","",s.lower())
     return set(s)
 
-
 def finish(ans:str):
     q=qs[st.session_state.idx]
     ms=int((time.time()-st.session_state.q_start)*1000) if st.session_state.q_start else 0
@@ -163,35 +153,33 @@ def finish(ans:str):
          (ans.lower()==q["correct"].lower())
     if SHEET:
         log_q.put([datetime.datetime.utcnow().isoformat(), st.session_state.name,
-                   q["№"],q["group"],q["alg"],q["qtype"],
-                   q["prompt"],ans,q["correct"],ms,ok])
-    q.update({"ответ":ans or "—","время, мс":f"{ms:,}",
-              "✓":"✅" if ok else "❌"})
+                   q["№"],q["group"],q["alg"],q["qtype"],q["prompt"],ans,q["correct"],ms,ok])
+    q.update({"ответ":ans or "—","время, мс":f"{ms:,}","✓":"✅" if ok else "❌"})
     st.session_state.idx+=1
-    st.session_state.phase="intro"
-    st.session_state.intro_start=None
-    st.session_state.q_start=None
-    st.session_state.blank_until=time.time()+1.0
+    st.session_state.phase="intro"; st.session_state.intro_start=None
+    st.session_state.q_start=None; st.session_state.blank_until=time.time()+1.0
     st.experimental_rerun()
-
 
 i=st.session_state.idx
 if i<total_q:
     q=qs[i]
 
+    
     if st.session_state.phase=="intro":
+        intro_limit = 8 if i<5 else 2
         if st.session_state.intro_start is None:
             st.session_state.intro_start=time.time()
         elapsed=time.time()-st.session_state.intro_start
-        left_intro=max(int(INTRO_TIME-elapsed),0)
+        left_intro=max(int(intro_limit-elapsed),0)
         st_autorefresh(interval=500,key=f"intro{i}")
+
         if q["qtype"]=="corners":
             st.markdown("""
             <div style="font-size:1.1rem;">
             Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
             диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
             и определить, окрашены ли они в один цвет.<br><br>
-            Картинка будет доступна в течение <b>15 секунд</b>. Время на ответ не ограничено.
+            Картинка будет доступна в течение <b>15&nbsp;секунд</b>. Время на ответ не ограничено.
             </div>""", unsafe_allow_html=True)
         else:
             st.markdown("""
@@ -203,12 +191,12 @@ if i<total_q:
             На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.
             </div>""", unsafe_allow_html=True)
         st.markdown(f"**Начало показа через&nbsp;{left_intro} с**")
-        if elapsed>=INTRO_TIME:
-            st.session_state.phase="question"
-            st.session_state.q_start=None
+        if elapsed>=intro_limit:
+            st.session_state.phase="question"; st.session_state.q_start=None
             st.experimental_rerun()
         st.stop()
 
+    # ---------- question ----------
     if st.session_state.q_start is None:
         st.session_state.q_start=time.time()
     elapsed_q=time.time()-st.session_state.q_start
@@ -220,7 +208,7 @@ if i<total_q:
         <svg width="70" height="70"><circle cx="35" cy="35" r="26" stroke="#444"
         stroke-width="6" fill="none"/><circle cx="35" cy="35" r="26"
         stroke="#52b788" stroke-width="6" fill="none" stroke-dasharray="163.36"
-        stroke-dashoffset="{163.36*(left/TIME_LIMIT)}"
+        stroke-dashoffset="{163.36*(left/15)}"
         transform="rotate(-90 35 35)"/></svg>
         <span style="position:absolute;top:50%;left:50%;
         transform:translate(-50%,-50%);font:700 1.2rem sans-serif;color:#52b788">{left}</span>
@@ -235,22 +223,23 @@ if i<total_q:
     if q["qtype"]=="corners":
         sel_map={"Да, углы одного цвета.":"да",
                  "Нет, углы окрашены в разные цвета.":"нет",
-                 "Затрудняюсь ответить.":"затрудняюсь"}
+                 "Затрудняюсь ответить":"затрудняюсь"}
         sel=st.radio(q["prompt"],list(sel_map.keys()),index=None,key=f"radio{i}")
         if sel: finish(sel_map[sel])
     else:
-        txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
-        col1,col2=st.columns([1,1])
-        with col1:
-            if st.button("Ответить",key=f"submit{i}") and txt:
+        cols=st.columns([3,1])
+        with cols[0]:
+            txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
+        with cols[1]:
+            if st.button("Ответить",key=f"submit{i}",use_container_width=True) and txt:
                 if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
                     finish(txt.strip())
                 else:
                     st.error("Допустимы только русские буквы и знаки пунктуации.")
-        with col2:
-            if st.button("Не вижу букв",key=f"skip{i}"):
-                finish("Не вижу")
+        if st.button("Не вижу букв",key=f"skip{i}",use_container_width=True):
+            finish("Не вижу")
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
+
 
