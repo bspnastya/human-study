@@ -41,7 +41,6 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
     unsafe_allow_html=True,
 )
 
-
 @st.cache_resource(show_spinner="…")
 def get_sheet() -> gspread.Worksheet:
     scopes = [
@@ -76,9 +75,10 @@ def _writer():
 
 threading.Thread(target=_writer, daemon=True).start()
 
+
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15          
-INTRO_TIME = 8           
+INTRO_TIME = 8        
 
 GROUPS = [
     "img1_dif_corners",
@@ -109,8 +109,10 @@ LETTER_ANS = {
     "img5_same_corners": "юэы",
 }
 
+
 def file_url(g: str, a: str) -> str:
     return f"{BASE_URL}/{g}_{a}.png"
+
 
 def make_questions() -> List[Dict]:
     per_group: dict[str, list] = {g: [] for g in GROUPS}
@@ -239,11 +241,13 @@ def finish(ans: str):
     st.session_state.q_start = None
     st.experimental_rerun()
 
+
+
 i = st.session_state.idx
 if i < total_q:
     q = qs[i]
 
-
+   
     intro_limit = 8 if i < 5 else 2
     if st.session_state.phase == "intro":
         if st.session_state.intro_start is None:
@@ -319,12 +323,21 @@ if i < total_q:
     if q["qtype"] == "corners":
         sel = st.radio(
             q["prompt"],
-            ("Да, углы одного цвета.", "Нет, углы окрашены в разные цвета."),
+            (
+                "Да, углы одного цвета.",
+                "Нет, углы окрашены в разные цвета.",
+                "Затрудняюсь ответить.",
+            ),
             index=None,
             key=f"radio{i}",
         )
         if sel:
-            finish("да" if sel.startswith("Да") else "нет")
+            if sel.startswith("Да"):
+                finish("да")
+            elif sel.startswith("Нет"):
+                finish("нет")
+            else:
+                finish("затрудняюсь")
     else:
         txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
         if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
@@ -336,6 +349,7 @@ if i < total_q:
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
+
 
 
 
