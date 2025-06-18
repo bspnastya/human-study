@@ -11,7 +11,6 @@ st.set_page_config(page_title="Визуализация многоканальн
                    page_icon="🎯", layout="centered",
                    initial_sidebar_state="collapsed")
 
-
 st.markdown("""<style>
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
@@ -23,58 +22,107 @@ header[data-testid="stHeader"],div[data-testid="stHeader"]{display:none;}
 input[data-testid="stTextInput"]{
   height:52px!important;padding:0 16px!important;font-size:1.05rem;}
 .stButton>button{
-  min-height:52px!important;padding:0 24px!important;border:1px solid #555!important;
-  background:#222!important;color:#fff!important;border-radius:8px;}
+  min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;
+  background:#222!important;color:#ddd!important;border-radius:8px;}
+
+div[data-testid="column"] {
+    padding: 0 5px !important;
+}
+
+div[data-testid="column"] > div {
+    padding: 0 !important;
+}
+
 #mobile-overlay{position:fixed;inset:0;z-index:9999;background:#808080;display:none;
   align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;
   text-align:center;padding:0 20px;}
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
+
+
+.custom-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.custom-btn {
+    flex: 1;
+    min-height: 52px;
+    padding: 0 20px;
+    border: 1px solid;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-submit {
+    background: #2d6a4f !important;
+    border-color: #2d6a4f !important;
+    color: white !important;
+}
+
+.btn-submit:hover {
+    background: #25593f !important;
+    border-color: #25593f !important;
+}
+
+.btn-skip {
+    background: #8d0801 !important;
+    border-color: #8d0801 !important;
+    color: white !important;
+}
+
+.btn-skip:hover {
+    background: #7a0701 !important;
+    border-color: #7a0701 !important;
+}
 </style>
 <div id="mobile-overlay">
   Уважаемый&nbsp;участник,<br>
   данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>""", unsafe_allow_html=True)
 
-
 @st.cache_resource(show_spinner="…")
 def get_sheet() -> gspread.Worksheet:
-    scopes=["https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"]
-    gc=gspread.authorize(
+    scopes = ["https://spreadsheets.google.com/feeds",
+              "https://www.googleapis.com/auth/drive"]
+    gc = gspread.authorize(
         ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gsp"]),
                                                          scopes))
     return gc.open("human_study_results").sheet1
 try:
-    SHEET=get_sheet()
+    SHEET = get_sheet()
 except Exception:
-    SHEET=None
+    SHEET = None
 
 log_q: "queue.Queue[list]" = queue.Queue()
 def _writer():
     while True:
-        row=log_q.get()
+        row = log_q.get()
         try:
             if SHEET: SHEET.append_row(row)
         except Exception as e:
-            print("Sheets error:",e)
+            print("Sheets error:", e)
         log_q.task_done()
-threading.Thread(target=_writer,daemon=True).start()
+threading.Thread(target=_writer, daemon=True).start()
 
 
-BASE_URL="https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT=15
+BASE_URL   = "https://storage.yandexcloud.net/test3123234442"
+TIME_LIMIT = 15       
 
-GROUPS=[
+GROUPS = [
     "img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
     "img4_same_corners","img5_same_corners"
 ]
-ALGS=["pca_rgb_result","socolov_lab_result","socolov_rgb_result","umap_rgb_result"]
+ALGS = ["pca_rgb_result","socolov_lab_result","socolov_rgb_result","umap_rgb_result"]
 
-CORNER_ANS={
+CORNER_ANS = {
     "img1_dif_corners":"нет","img2_dif_corners":"нет",
     "img3_same_corners_no_symb":"да","img4_same_corners":"да","img5_same_corners":"да",
 }
-LETTER_ANS={
+LETTER_ANS = {
     "img1_dif_corners":"ж","img2_dif_corners":"фя",
     "img3_same_corners_no_symb":"Не вижу",
     "img4_same_corners":"аб","img5_same_corners":"юэы",
@@ -83,28 +131,26 @@ LETTER_ANS={
 def file_url(g:str,a:str)->str: return f"{BASE_URL}/{g}_{a}.png"
 
 def make_questions() -> List[Dict]:
-    pool=[]
+    per_group={g:[] for g in GROUPS}
     for g,a in itertools.product(GROUPS,ALGS):
-        pool.append(dict(group=g,alg=a,img=file_url(g,a),qtype="corners",
-                         prompt="Правый верхний и левый нижний угол — одного цвета?",
-                         correct=CORNER_ANS[g]))
-        pool.append(dict(group=g,alg=a,img=file_url(g,a),qtype="letters",
-                         prompt="Если на изображении вы видите буквы, то укажите, какие именно.",
-                         correct=LETTER_ANS[g]))
+        per_group[g].append(dict(group=g,alg=a,img=file_url(g,a),
+                                 qtype="corners",
+                                 prompt="Правый верхний и левый нижний угол — одного цвета?",
+                                 correct=CORNER_ANS[g]))
+        per_group[g].append(dict(group=g,alg=a,img=file_url(g,a),
+                                 qtype="letters",
+                                 prompt="Если на изображении вы видите буквы, то укажите, какие именно.",
+                                 correct=LETTER_ANS[g]))
+    for v in per_group.values(): random.shuffle(v)
 
-    random.shuffle(pool)
-
-   
-    for i in range(1,len(pool)):
-        if pool[i]["group"]==pool[i-1]["group"]:
-            j=i+1
-            while j<len(pool) and pool[j]["group"]==pool[i]["group"]:
-                j+=1
-            if j<len(pool):
-                pool[i],pool[j]=pool[j],pool[i]
-
-    for n,q in enumerate(pool,1): q["№"]=n
-    return pool
+    ordered=[]
+    while any(per_group.values()):
+        cycle=list(GROUPS); random.shuffle(cycle)
+        for g in cycle:
+            if per_group[g]:
+                ordered.append(per_group[g].pop())
+    for n,q in enumerate(ordered,1): q["№"]=n
+    return ordered
 
 if "questions" not in st.session_state:
     st.session_state.update(questions=make_questions(), idx=0,
@@ -113,11 +159,13 @@ if "questions" not in st.session_state:
 qs=st.session_state.questions; total_q=len(qs)
 
 
+if "button_clicked" not in st.session_state:
+    st.session_state.button_clicked = None
+
 if st.session_state.get("blank_until",0)>time.time():
     st_autorefresh(interval=250,key="blank"); st.stop()
 elif "blank_until" in st.session_state:
     del st.session_state["blank_until"]
-
 
 if not st.session_state.name:
     st.markdown("""<div style="color:#111;">
@@ -145,7 +193,6 @@ if not st.session_state.name:
     st.stop()
 
 
-letters_re=r"[А-Яа-яЁё ,.;:-]+"
 def letters_set(s:str)->set[str]:
     return set(re.sub(r"[ ,.;:-]+","",s.lower()))
 
@@ -161,8 +208,8 @@ def finish(ans:str):
     st.session_state.idx+=1
     st.session_state.phase="intro"; st.session_state.intro_start=None
     st.session_state.q_start=None; st.session_state.blank_until=time.time()+1.0
+    st.session_state.button_clicked = None  # Сброс состояния кнопки
     st.experimental_rerun()
-
 
 i=st.session_state.idx
 if i<total_q:
@@ -199,7 +246,7 @@ if i<total_q:
             st.experimental_rerun()
         st.stop()
 
-   
+  
     if st.session_state.q_start is None:
         st.session_state.q_start=time.time()
     elapsed_q=time.time()-st.session_state.q_start
@@ -231,28 +278,56 @@ if i<total_q:
         if sel: finish(sel_map[sel])
     else:
         txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
-        if txt and not re.fullmatch(letters_re,txt):
+        if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
             st.error("Допустимы только русские буквы и знаки пунктуации.")
 
-        col_sub,col_skip=st.columns([1,1])
-        if col_sub.button("Ответить",key=f"submit{i}"):
-            if not txt:
-                st.warning("Введите ответ или нажмите «Не вижу букв».")
-            elif not re.fullmatch(letters_re,txt):
-                st.error("Исправьте ответ — только русские буквы и знаки пунктуации.")
-            else:
-                finish(txt.strip())
-        if col_skip.button("Не вижу букв",key=f"skip{i}"):
-            finish("Не вижу")
 
-    
-    components.html("""
-<script>
-for (const b of parent.document.querySelectorAll('button')) {
-  if (b.innerText.trim()==='Ответить'){b.style.background='#2d6a4f';}
-  if (b.innerText.trim()==='Не вижу букв'){b.style.background='#8d0801';}
-}
-</script>""",height=0)
+        button_html = f"""
+        <div class="custom-buttons">
+            <button class="custom-btn btn-submit" onclick="submitAnswer()">Ответить</button>
+            <button class="custom-btn btn-skip" onclick="skipAnswer()">Не вижу букв</button>
+        </div>
+        
+        <script>
+        function submitAnswer() {{
+            const textInput = parent.document.querySelector('[data-testid="stTextInput"] input');
+            const inputValue = textInput ? textInput.value.trim() : '';
+            
+            if (!inputValue) {{
+                alert('Пожалуйста, введите ответ или нажмите "Не вижу букв"');
+                return;
+            }}
+            
+            if (!/^[А-Яа-яЁё ,.;:-]+$/.test(inputValue)) {{
+                alert('Допустимы только русские буквы и знаки пунктуации.');
+                return;
+            }}
+            
+           
+            window.parent.postMessage({{
+                type: 'streamlit:setComponentValue',
+                value: {{ action: 'submit', text: inputValue }}
+            }}, '*');
+        }}
+        
+        function skipAnswer() {{
+            window.parent.postMessage({{
+                type: 'streamlit:setComponentValue',
+                value: {{ action: 'skip', text: 'Не вижу' }}
+            }}, '*');
+        }}
+        </script>
+        """
+        
+       
+        button_result = components.html(button_html, height=80, key=f"buttons{i}")
+        
+  
+        if button_result:
+            if button_result.get('action') == 'submit':
+                finish(button_result.get('text', ''))
+            elif button_result.get('action') == 'skip':
+                finish("Не вижу")
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
