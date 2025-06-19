@@ -1,5 +1,4 @@
 from __future__ import annotations
-from streamlit_autorefresh import st_autorefresh
 import random, time, datetime, secrets, threading, queue, re, itertools
 from typing import List, Dict
 import streamlit as st, streamlit.components.v1 as components
@@ -152,14 +151,129 @@ def make_questions() -> List[Dict]:
     return ordered
 
 
+def create_intro_timer(duration, question_type, is_first_questions=False):
+  
+    key = f"intro_timer_{st.session_state.idx}_{time.time()}"
+    
+    if question_type == "corners":
+        instruction = """
+        <div style="font-size:1.1rem;">
+        Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
+        диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
+        и определить, окрашены ли они в один цвет.<br><br>
+        Картинка будет доступна в течение <b>15&nbsp;секунд</b>. Время на ответ не ограничено.
+        </div>
+        """
+    else:
+        instruction = """
+        <div style="font-size:1.1rem;">
+        Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
+        представленной картинке <b>буквы русского алфавита</b>.
+        Найденные буквы необходимо ввести в текстовое поле: допускается разделение
+        пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>
+        На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.
+        </div>
+        """
+    
+    components.html(f"""
+    <div>
+        {instruction}
+        <div id="countdown" style="font-size:1.2rem;font-weight:bold;margin-top:20px;">
+            Начало показа через <span id="timer">{duration}</span> с
+        </div>
+    </div>
+    
+    <script>
+    let timeLeft = {duration};
+    const timerElement = document.getElementById('timer');
+    
+    const countdown = setInterval(() => {{
+        timeLeft--;
+        timerElement.textContent = timeLeft;
+        
+        if (timeLeft <= 0) {{
+            clearInterval(countdown);
+            // Отправляем событие в Streamlit для перехода к вопросу
+            window.parent.postMessage({{
+                type: 'streamlit:setComponentValue',
+                key: '{key}',
+                value: 'start_question'
+            }}, '*');
+        }}
+    }}, 1000);
+    </script>
+    """, height=200, key=key)
+    
+    return key
+
+
+def create_question_timer(duration, image_url):
+    key = f"question_timer_{st.session_state.idx}_{time.time()}"
+    
+    components.html(f"""
+    <div style="display:flex;gap:16px;align-items:center;margin-bottom:20px;">
+        <div style="position:relative;width:70px;height:70px">
+            <svg width="70" height="70">
+                <circle cx="35" cy="35" r="26" stroke="#444" stroke-width="6" fill="none"/>
+                <circle id="progress" cx="35" cy="35" r="26" stroke="#52b788" stroke-width="6" fill="none"
+                        stroke-dasharray="163.36"
+                        stroke-dashoffset="0"
+                        transform="rotate(-90 35 35)"
+                        style="transition: stroke-dashoffset 1s linear;"/>
+            </svg>
+            <span id="timer-text" style="position:absolute;top:50%;left:50%;
+                  transform:translate(-50%,-50%);font:700 1.2rem sans-serif;color:#52b788">
+                {duration}
+            </span>
+        </div>
+        <div id="image-container" style="flex:1;">
+            <img src="{image_url}" style="max-width:290px;max-height:400px;" />
+        </div>
+    </div>
+    
+    <script>
+    let timeLeft = {duration};
+    const timerText = document.getElementById('timer-text');
+    const progressCircle = document.getElementById('progress');
+    const imageContainer = document.getElementById('image-container');
+    const circumference = 163.36;
+    
+    const countdown = setInterval(() => {{
+        timeLeft--;
+        timerText.textContent = timeLeft;
+        
+
+        const progress = timeLeft / {duration};
+        const offset = circumference * progress;
+        progressCircle.style.strokeDashoffset = offset;
+        
+        if (timeLeft <= 0) {{
+            clearInterval(countdown);
+  
+            imageContainer.innerHTML = '<i>Время показа изображения истекло.</i>';
+            
+
+            window.parent.postMessage({{
+                type: 'streamlit:setComponentValue',
+                key: '{key}',
+                value: 'time_up'
+            }}, '*');
+        }}
+    }}, 1000);
+    </script>
+    """, height=300, key=key)
+    
+    return key
+
+
 if "questions" not in st.session_state:
     st.session_state.update(
         questions=make_questions(),
         idx=0,
         name="",
-        q_start=None,
         phase="intro",
-        intro_start=None,
+        timer_key=None,
+        question_start_time=None,
     )
 
 qs = st.session_state.questions
@@ -193,10 +307,10 @@ if not st.session_state.name:
     )
     if st.button("🎲 Сгенерировать псевдоним"):
         st.session_state.name = f"Участник_{secrets.randbelow(900_000)+100_000}"
-        st.experimental_rerun()
+        st.rerun()
     if uname:
         st.session_state.name = uname.strip()
-        st.experimental_rerun()
+        st.rerun()
     st.stop()
 
 
@@ -206,7 +320,7 @@ def letters_set(s: str) -> set[str]:
 
 def finish(ans: str):
     q = qs[st.session_state.idx]
-    ms = int((time.time() - st.session_state.q_start) * 1000) if st.session_state.q_start else 0
+    ms = int((time.time() - st.session_state.question_start_time) * 1000) if st.session_state.question_start_time else 0
     ok = (
         letters_set(ans) == letters_set(q["correct"])
         if q["qtype"] == "letters"
@@ -237,115 +351,82 @@ def finish(ans: str):
     )
     st.session_state.idx += 1
     st.session_state.phase = "intro"
-    st.session_state.intro_start = None
-    st.session_state.q_start = None
-    st.experimental_rerun()
-
+    st.session_state.timer_key = None
+    st.session_state.question_start_time = None
+    st.rerun()
 
 
 i = st.session_state.idx
 if i < total_q:
     q = qs[i]
-
-
-    intro_limit = 8 if i < 5 else 2
+    
     if st.session_state.phase == "intro":
-        if st.session_state.intro_start is None:
-            st.session_state.intro_start = time.time()
-        elapsed = time.time() - st.session_state.intro_start
-        left_intro = max(int(intro_limit - elapsed), 0)
-        st_autorefresh(interval=500, key=f"intro{i}")
-
-        if q["qtype"] == "corners":
-            st.markdown(
-                """
-<div style="font-size:1.1rem;">
-Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
-диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
-и определить, окрашены ли они в один цвет.<br><br>
-Картинка будет доступна в течение <b>15&nbsp;секунд</b>. Время на ответ не ограничено.
-</div>""",
-                unsafe_allow_html=True,
+        intro_limit = 8 if i < 5 else 2
+        
+ 
+        if st.session_state.timer_key:
+            timer_value = st.session_state.get(st.session_state.timer_key)
+            if timer_value == 'start_question':
+                st.session_state.phase = "question"
+                st.session_state.question_start_time = time.time()
+                st.session_state.timer_key = None
+                st.rerun()
+        
+   
+        if not st.session_state.timer_key:
+            st.session_state.timer_key = create_intro_timer(
+                intro_limit, 
+                q["qtype"], 
+                i < 5
             )
-        else:
-            st.markdown(
-                """
-<div style="font-size:1.1rem;">
-Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
-представленной картинке <b>буквы русского алфавита</b>.
-Найденные буквы необходимо ввести в текстовое поле: допускается разделение
-пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>
-На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.
-</div>""",
-                unsafe_allow_html=True,
-            )
-        st.markdown(f"**Начало показа через&nbsp;{left_intro} с**")
-        if elapsed >= intro_limit:
-            st.session_state.phase = "question"
-            st.session_state.q_start = None
-            st.experimental_rerun()
+        
         st.stop()
+    
+    elif st.session_state.phase == "question":
+        if not st.session_state.question_start_time:
+            st.session_state.question_start_time = time.time()
+        
+        st.markdown(f"### Вопрос №{q['№']} из {total_q}")
+        
 
-
-    if st.session_state.q_start is None:
-        st.session_state.q_start = time.time()
-    elapsed_q = time.time() - st.session_state.q_start
-    left = max(TIME_LIMIT - int(elapsed_q), 0)
-    st_autorefresh(interval=1000, key=f"q{i}")
-
-    components.html(
-        f"""
-<div style="display:flex;gap:16px;height:70px">
-  <div style="position:relative;width:70px;height:70px">
-    <svg width="70" height="70">
-      <circle cx="35" cy="35" r="26" stroke="#444" stroke-width="6" fill="none"/>
-      <circle cx="35" cy="35" r="26" stroke="#52b788" stroke-width="6" fill="none"
-              stroke-dasharray="163.36"
-              stroke-dashoffset="{163.36 * (left / 15)}"
-              transform="rotate(-90 35 35)"/>
-    </svg>
-    <span style="position:absolute;top:50%;left:50%;
-          transform:translate(-50%,-50%);font:700 1.2rem sans-serif;color:#52b788">
-      {left}
-    </span>
-  </div>
-</div>
-""",
-        height=80,
-    )
-
-    st.markdown(f"### Вопрос №{q['№']} из {total_q}")
-    if left > 0:
-        st.image(q["img"], width=290, clamp=True)
-    else:
-        st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
-
-    if q["qtype"] == "corners":
-        sel = st.radio(
-            q["prompt"],
-            (
-                "Да, углы одного цвета.",
-                "Нет, углы окрашены в разные цвета.",
-                "Затрудняюсь ответить.",
-            ),
-            index=None,
-            key=f"radio{i}",
-        )
-        if sel:
-            if sel.startswith("Да"):
-                finish("да")
-            elif sel.startswith("Нет"):
-                finish("нет")
-            else:
-                finish("затрудняюсь")
-    else:
-        txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
-        if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-            st.error("Допустимы только русские буквы и знаки пунктуации.")
-        if st.button("Не вижу букв", key=f"skip{i}"):
-            finish("Не вижу")
-        if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-            finish(txt.strip())
+        if not st.session_state.timer_key or 'question_timer' not in st.session_state.timer_key:
+            st.session_state.timer_key = create_question_timer(TIME_LIMIT, q["img"])
+        
+       
+        timer_value = st.session_state.get(st.session_state.timer_key) if st.session_state.timer_key else None
+        image_expired = timer_value == 'time_up'
+        
+        if not image_expired:
+     
+            pass  
+        
+   
+        if q["qtype"] == "corners":
+            sel = st.radio(
+                q["prompt"],
+                (
+                    "Да, углы одного цвета.",
+                    "Нет, углы окрашены в разные цвета.",
+                    "Затрудняюсь ответить.",
+                ),
+                index=None,
+                key=f"radio{i}",
+            )
+            if sel:
+                if sel.startswith("Да"):
+                    finish("да")
+                elif sel.startswith("Нет"):
+                    finish("нет")
+                else:
+                    finish("затрудняюсь")
+        else:
+            txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
+            if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+                st.error("Допустимы только русские буквы и знаки пунктуации.")
+            if st.button("Не вижу букв", key=f"skip{i}"):
+                finish("Не вижу")
+            if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+                finish(txt.strip())
 
 else:
     st.success("Вы завершили прохождение. Спасибо за участие!")
