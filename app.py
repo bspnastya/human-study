@@ -1,10 +1,11 @@
 from __future__ import annotations
-import random, time, datetime, secrets, threading, queue, re, itertools, requests
+from streamlit_autorefresh import st_autorefresh
+import random, time, datetime, secrets, threading, queue, re, itertools
 from typing import List, Dict
 import streamlit as st, streamlit.components.v1 as components
-from streamlit_autorefresh import st_autorefresh
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+
 
 st.set_page_config(
     page_title="Визуализация многоканальных изображений",
@@ -12,7 +13,6 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed",
 )
-
 st.markdown(
     """
 <style>
@@ -53,12 +53,14 @@ def get_sheet() -> gspread.Worksheet:
     )
     return gc.open("human_study_results").sheet1
 
+
 try:
     SHEET = get_sheet()
 except Exception:
-    SHEET = None
+    SHEET = None  
 
 log_q: queue.Queue[List] = queue.Queue()
+
 
 def _writer():
     while True:
@@ -70,55 +72,13 @@ def _writer():
             print("Sheets error:", e)
         log_q.task_done()
 
+
 threading.Thread(target=_writer, daemon=True).start()
 
-@st.cache_data(show_spinner=False)
-def load_img(url: str) -> bytes:
-    return requests.get(url, timeout=6).content
-
-def html_timer(total_sec: int, key: str = "", prefix: str = ""):
-    components.html(
-        f"""
-<div style="display:flex;gap:16px;height:70px">
-  <div style="position:relative;width:70px;height:70px">
-    <svg width="70" height="70">
-      <circle cx="35" cy="35" r="26" stroke="#444" stroke-width="6" fill="none"/>
-      <circle id="bar-{key}" cx="35" cy="35" r="26" stroke="#52b788" stroke-width="6" fill="none"
-              stroke-dasharray="163.36" stroke-dashoffset="0" transform="rotate(-90 35 35)"/>
-    </svg>
-    <span id="lbl-{key}" style="position:absolute;top:50%;left:50%;
-          transform:translate(-50%,-50%);font:700 1.2rem sans-serif;color:#52b788">
-      {total_sec}
-    </span>
-  </div>
-  {"<div style='font:500 1rem sans-serif;color:#52b788;align-self:center;' id='txt-"+key+"'>"+prefix+str(total_sec)+" с</div>" if prefix else ""}
-</div>
-<script>
-(function () {{
-  const dash = 163.36;
-  const ttl  = {total_sec};
-  let left = ttl;
-  const bar = document.getElementById("bar-{key}");
-  const lbl = document.getElementById("lbl-{key}");
-  const txt = document.getElementById("txt-{key}");
-  function tick() {{
-    left -= 1;
-    if (left < 0) return;
-    lbl.textContent = left;
-    bar.style.strokeDashoffset = dash * (1 - left/ttl);
-    if (txt) txt.textContent = "{prefix}" + left + " с";
-    setTimeout(tick, 1000);
-  }}
-  setTimeout(tick, 1000);
-}})();
-</script>
-""",
-        height=80,
-    )
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15
-INTRO_TIME = 8
+INTRO_TIME = 8           
 
 GROUPS = [
     "img1_dif_corners",
@@ -149,6 +109,7 @@ LETTER_ANS = {
     "img5_same_corners": "юэы",
 }
 
+
 def file_url(g: str, a: str) -> str:
     return f"{BASE_URL}/{g}_{a}.png"
 
@@ -177,6 +138,7 @@ def make_questions() -> List[Dict]:
         )
     for lst in per_group.values():
         random.shuffle(lst)
+
     ordered = []
     while any(per_group.values()):
         cycle = list(GROUPS)
@@ -187,6 +149,7 @@ def make_questions() -> List[Dict]:
     for n, q in enumerate(ordered, 1):
         q["№"] = n
     return ordered
+
 
 if "questions" not in st.session_state:
     st.session_state.update(
@@ -200,6 +163,7 @@ if "questions" not in st.session_state:
 
 qs = st.session_state.questions
 total_q = len(qs)
+
 
 if not st.session_state.name:
     st.markdown(
@@ -235,8 +199,10 @@ if not st.session_state.name:
         st.experimental_rerun()
     st.stop()
 
+
 def letters_set(s: str) -> set[str]:
     return set(re.sub(r"[ ,.;:-]+", "", s.lower()))
+
 
 def finish(ans: str):
     q = qs[st.session_state.idx]
@@ -274,91 +240,6 @@ def finish(ans: str):
     st.session_state.intro_start = None
     st.session_state.q_start = None
     st.experimental_rerun()
-
-i = st.session_state.idx
-if i < total_q:
-    q = qs[i]
-    intro_limit = 8 if i < 5 else 2
-    if st.session_state.phase == "intro":
-        if st.session_state.intro_start is None:
-            st.session_state.intro_start = time.time()
-        elapsed_intro = time.time() - st.session_state.intro_start
-        remain_intro = max(intro_limit - int(elapsed_intro), 0)
-        html_timer(remain_intro if remain_intro > 0 else 0, key=f"intro{i}", prefix="Начало показа через ")
-        if elapsed_intro >= intro_limit:
-            st.session_state.phase = "question"
-            st.session_state.q_start = None
-            st.session_state.intro_start = None
-            st.experimental_rerun()
-        st_autorefresh(interval=1000, limit=1, key=f"intro-refresh-{i}")
-        if q["qtype"] == "corners":
-            st.markdown(
-                """
-<div style="font-size:1.1rem;">
-Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
-диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
-и определить, окрашены ли они в один цвет.<br><br>
-Картинка будет доступна в течение <b>15&nbsp;секунд</b>. Время на ответ не ограничено.
-</div>""",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                """
-<div style="font-size:1.1rem;">
-Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
-представленной картинке <b>буквы русского алфавита</b>.
-Найденные буквы необходимо ввести в текстовое поле: допускается разделение
-пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>
-На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.
-</div>""",
-                unsafe_allow_html=True,
-            )
-        st.stop()
-    if st.session_state.q_start is None:
-        st.session_state.q_start = time.time()
-    left = max(TIME_LIMIT - int(time.time() - st.session_state.q_start), 0)
-    html_timer(left if left > 0 else 0, key=f"q{i}")
-    st_autorefresh(interval=1000, limit=1, key=f"q-refresh-{i}")
-    st.markdown(f"### Вопрос №{q['№']} из {total_q}")
-    if left > 0:
-        st.image(load_img(q["img"]), width=290, clamp=True)
-    else:
-        st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
-    if q["qtype"] == "corners":
-        sel = st.radio(
-            q["prompt"],
-            (
-                "Да, углы одного цвета.",
-                "Нет, углы окрашены в разные цвета.",
-                "Затрудняюсь ответить.",
-            ),
-            index=None,
-            key=f"radio{i}",
-        )
-        if sel:
-            if sel.startswith("Да"):
-                finish("да")
-            elif sel.startswith("Нет"):
-                finish("нет")
-            else:
-                finish("затрудняюсь")
-    else:
-        txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
-        if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-            st.error("Допустимы только русские буквы и знаки пунктуации.")
-        if st.button("Не вижу букв", key=f"skip{i}"):
-            finish("Не вижу")
-        if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-            finish(txt.strip())
-else:
-    st.markdown("""
-    <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
-                 color:#fff;background:#262626;border-radius:12px;">
-        Вы завершили прохождение.<br><b>Спасибо за участие!</b>
-    </div>
-    """, unsafe_allow_html=True)
-    st.balloons()
 
 
 
