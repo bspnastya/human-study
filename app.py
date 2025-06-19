@@ -65,7 +65,7 @@ def html_timer(total_sec:int,key:str="",prefix:str=""):
   <svg width="70" height="70">
    <circle cx="35" cy="35" r="26" stroke="#444" stroke-width="6" fill="none"/>
    <circle id="bar-{key}" cx="35" cy="35" r="26" stroke="#52b788" stroke-width="6" fill="none"
-           stroke-dasharray="163.36" stroke-dashoffset="0" transform="rotate(-90 35 35)"/>
+           stroke-dasharray="163.36" stroke-dashoffset="{163.36}" transform="rotate(-90 35 35)"/>
   </svg>
   <span id="lbl-{key}" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
         font:700 1.2rem sans-serif;color:#52b788">{total_sec}</span>
@@ -83,7 +83,7 @@ def html_timer(total_sec:int,key:str="",prefix:str=""):
   left-=1;
   if(left<0)return;
   lbl.textContent=left;
-  bar.style.strokeDashoffset=dash*(left/ttl);
+  bar.style.strokeDashoffset=dash*left/ttl;
   if(txt)txt.textContent="{prefix}"+left+" с";
   setTimeout(tick,1000);
  }}
@@ -118,7 +118,7 @@ def make_questions()->List[Dict]:
 
 if "questions" not in st.session_state:
     st.session_state.update(questions=make_questions(),idx=0,name="",
-                            phase="intro",intro_deadline=None,question_deadline=None)
+                            phase="intro",deadline=None,start_time=None)
 
 qs,total_q=st.session_state.questions,len(st.session_state.questions)
 
@@ -154,13 +154,13 @@ if not st.session_state.name:
 def letters_set(s:str)->set[str]:return set(re.sub(r"[ ,.;:-]+","",s.lower()))
 def finish(ans:str):
     q=qs[st.session_state.idx]
-    ms=int((time.time()-st.session_state.question_start)*1000) if st.session_state.question_start else 0
+    ms=int((time.time()-st.session_state.start_time)*1000) if st.session_state.start_time else 0
     ok=(letters_set(ans)==letters_set(q["correct"]) if q["qtype"]=="letters" else ans.lower()==q["correct"].lower())
     if SHEET: log_q.put([datetime.datetime.utcnow().isoformat(),st.session_state.name,q["№"],q["group"],
                          q["alg"],q["qtype"],q["prompt"],ans,q["correct"],ms,ok])
     q.update({"ответ":ans or "—","время, мс":f"{ms:,}","✓":"✅" if ok else "❌"})
     st.session_state.idx+=1
-    st.session_state.phase="intro";st.session_state.intro_deadline=None;st.session_state.question_deadline=None
+    st.session_state.phase="intro";st.session_state.deadline=None;st.session_state.start_time=None
     st.experimental_rerun()
 
 i=st.session_state.idx
@@ -169,14 +169,15 @@ if i<total_q:
 
     if st.session_state.phase=="intro":
         limit=8 if i<5 else 2
-        if st.session_state.intro_deadline is None:
-            st.session_state.intro_deadline=time.time()+limit
-        left=st.session_state.intro_deadline-time.time()
+        if st.session_state.deadline is None:
+            st.session_state.deadline=time.time()+limit
+        left=st.session_state.deadline-time.time()
         secs=max(math.ceil(left),0)
         html_timer(secs,key=f"intro{i}",prefix="Начало показа через ")
         if left<=0:
-            st.session_state.phase="question";st.experimental_rerun()
-        st_autorefresh(interval=500,key=f"tick-intro-{i}")
+            st.session_state.phase="question";st.session_state.deadline=None;st.session_state.start_time=None
+            st.experimental_rerun()
+        st_autorefresh(interval=int(left*1000)+100 if left>0 else 100,key=f"jump-intro-{i}",limit=1)
         if q["qtype"]=="corners":
             st.markdown("""
 <div style="font-size:1.1rem;">
@@ -196,13 +197,14 @@ if i<total_q:
 </div>""",unsafe_allow_html=True)
         st.stop()
 
-    if st.session_state.question_deadline is None:
-        st.session_state.question_deadline=time.time()+TIME_LIMIT
-        st.session_state.question_start=time.time()
-    left=st.session_state.question_deadline-time.time()
+    if st.session_state.deadline is None:
+        st.session_state.deadline=time.time()+TIME_LIMIT
+        st.session_state.start_time=time.time()
+    left=st.session_state.deadline-time.time()
     secs=max(math.ceil(left),0)
     html_timer(secs,key=f"q{i}")
-    st_autorefresh(interval=500,key=f"tick-q-{i}")
+    if left>0:
+        st_autorefresh(interval=int(left*1000)+100,key=f"jump-q-{i}",limit=1)
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
     if left>0:
         st.image(load_img(q["img"]),width=290,clamp=True)
@@ -216,9 +218,12 @@ if i<total_q:
             finish("да" if sel.startswith("Да") else "нет" if sel.startswith("Нет") else "затрудняюсь")
     else:
         txt=st.text_input(q["prompt"],key=f"in{i}",placeholder="Введите русские буквы")
-        if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt): st.error("Допустимы только русские буквы и знаки пунктуации.")
-        if st.button("Не вижу букв",key=f"skip{i}"): finish("Не вижу")
-        if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt): finish(txt.strip())
+        if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+            st.error("Допустимы только русские буквы и знаки пунктуации.")
+        if st.button("Не вижу букв",key=f"skip{i}"):
+            finish("Не вижу")
+        if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+            finish(txt.strip())
 else:
     st.markdown("""
     <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
@@ -227,6 +232,7 @@ else:
     </div>
     """,unsafe_allow_html=True)
     st.balloons()
+
 
 
 
