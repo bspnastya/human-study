@@ -289,7 +289,7 @@ if i < total_q:
             st.session_state.q_start = None
             st.session_state.intro_start = None
             st.experimental_rerun()
-        st_autorefresh(interval=500, limit=1, key=f"intro-refresh-{i}")
+        st_autorefresh(interval=500, key=f"intro-tick-{i}")
         if q["qtype"] == "corners":
             st.markdown(
                 """
@@ -319,7 +319,7 @@ if i < total_q:
     left = max(TIME_LIMIT - (time.time() - st.session_state.q_start), 0)
     html_timer(int(left), key=f"q{i}")
     if left > 0:
-        st_autorefresh(interval=1000, key=f"q-refresh-{i}")
+        st_autorefresh(interval=500, key=f"q-tick-{i}")
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
     if left > 0:
         st.image(load_img(q["img"]), width=290, clamp=True)
@@ -359,6 +359,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
     st.balloons()
+
 
 
 
