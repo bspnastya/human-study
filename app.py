@@ -1,19 +1,20 @@
 from __future__ import annotations
-from streamlit_autorefresh import st_autorefresh
 import random, time, datetime, secrets, threading, queue, re, itertools, requests
 from typing import List, Dict
 import streamlit as st, streamlit.components.v1 as components
+from streamlit_autorefresh import st_autorefresh
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+
 st.set_page_config(
     page_title="Визуализация многоканальных изображений",
     page_icon="🎯",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
-if not st.session_state.get("css_loaded"):
-    st.markdown(
-        """
+
+st.markdown(
+    """
 <style>
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
@@ -37,10 +38,8 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
   данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>
 """,
-        unsafe_allow_html=True,
-    )
-    st.session_state["css_loaded"] = True
-
+    unsafe_allow_html=True,
+)
 
 @st.cache_resource(show_spinner="…")
 def get_sheet() -> gspread.Worksheet:
@@ -283,8 +282,15 @@ if i < total_q:
     if st.session_state.phase == "intro":
         if st.session_state.intro_start is None:
             st.session_state.intro_start = time.time()
-        html_timer(intro_limit, key=f"intro{i}", prefix="Начало показа через ")
-        st_autorefresh(interval=int(intro_limit * 1000) + 200, limit=1, key=f"intro-refresh-{i}")
+        elapsed_intro = time.time() - st.session_state.intro_start
+        remain_intro = max(intro_limit - int(elapsed_intro), 0)
+        html_timer(remain_intro if remain_intro > 0 else 0, key=f"intro{i}", prefix="Начало показа через ")
+        if elapsed_intro >= intro_limit:
+            st.session_state.phase = "question"
+            st.session_state.q_start = None
+            st.session_state.intro_start = None
+            st.experimental_rerun()
+        st_autorefresh(interval=1000, limit=1, key=f"intro-refresh-{i}")
         if q["qtype"] == "corners":
             st.markdown(
                 """
@@ -312,8 +318,8 @@ if i < total_q:
     if st.session_state.q_start is None:
         st.session_state.q_start = time.time()
     left = max(TIME_LIMIT - int(time.time() - st.session_state.q_start), 0)
-    html_timer(TIME_LIMIT, key=f"q{i}")
-    st_autorefresh(interval=(TIME_LIMIT * 1000) + 200, limit=1, key=f"q-refresh-{i}")
+    html_timer(left if left > 0 else 0, key=f"q{i}")
+    st_autorefresh(interval=1000, limit=1, key=f"q-refresh-{i}")
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
     if left > 0:
         st.image(load_img(q["img"]), width=290, clamp=True)
@@ -353,6 +359,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
     st.balloons()
+
 
 
 
