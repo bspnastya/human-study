@@ -5,7 +5,12 @@ from typing import List, Dict
 import streamlit as st, streamlit.components.v1 as components
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-
+st.set_page_config(
+    page_title="Визуализация многоканальных изображений",
+    page_icon="🎯",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
 if not st.session_state.get("css_loaded"):
     st.markdown(
         """
@@ -36,12 +41,6 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
     )
     st.session_state["css_loaded"] = True
 
-st.set_page_config(
-    page_title="Визуализация многоканальных изображений",
-    page_icon="🎯",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
 
 @st.cache_resource(show_spinner="…")
 def get_sheet() -> gspread.Worksheet:
