@@ -118,7 +118,6 @@ def html_timer(total_sec: int, key: str = "", prefix: str = ""):
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15
-INTRO_TIME = 8
 
 GROUPS = [
     "img1_dif_corners",
@@ -283,14 +282,14 @@ if i < total_q:
         if st.session_state.intro_start is None:
             st.session_state.intro_start = time.time()
         elapsed_intro = time.time() - st.session_state.intro_start
-        remain_intro = max(intro_limit - int(elapsed_intro), 0)
-        html_timer(remain_intro if remain_intro > 0 else 0, key=f"intro{i}", prefix="Начало показа через ")
-        if elapsed_intro >= intro_limit:
+        remain_intro = max(intro_limit - elapsed_intro, 0)
+        html_timer(int(remain_intro), key=f"intro{i}", prefix="Начало показа через ")
+        if remain_intro <= 0:
             st.session_state.phase = "question"
             st.session_state.q_start = None
             st.session_state.intro_start = None
             st.experimental_rerun()
-        st_autorefresh(interval=1000, limit=1, key=f"intro-refresh-{i}")
+        st_autorefresh(interval=500, key=f"intro-refresh-{i}")
         if q["qtype"] == "corners":
             st.markdown(
                 """
@@ -317,9 +316,12 @@ if i < total_q:
         st.stop()
     if st.session_state.q_start is None:
         st.session_state.q_start = time.time()
-    left = max(TIME_LIMIT - int(time.time() - st.session_state.q_start), 0)
-    html_timer(left if left > 0 else 0, key=f"q{i}")
-    st_autorefresh(interval=1000, limit=1, key=f"q-refresh-{i}")
+    left = max(TIME_LIMIT - (time.time() - st.session_state.q_start), 0)
+    html_timer(int(left), key=f"q{i}")
+    if left <= 0:
+        st_autorefresh(interval=200, key=f"q-end-{i}")
+    else:
+        st_autorefresh(interval=int(left * 1000) + 200, key=f"q-end-{i}")
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
     if left > 0:
         st.image(load_img(q["img"]), width=290, clamp=True)
