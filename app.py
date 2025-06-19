@@ -1,20 +1,14 @@
 from __future__ import annotations
 from streamlit_autorefresh import st_autorefresh
-import random, time, datetime, secrets, threading, queue, re, itertools
+import random, time, datetime, secrets, threading, queue, re, itertools, requests
 from typing import List, Dict
 import streamlit as st, streamlit.components.v1 as components
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-
-st.set_page_config(
-    page_title="Визуализация многоканальных изображений",
-    page_icon="🎯",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
-st.markdown(
-    """
+if not st.session_state.get("css_loaded"):
+    st.markdown(
+        """
 <style>
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
@@ -38,7 +32,15 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
   данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>
 """,
-    unsafe_allow_html=True,
+        unsafe_allow_html=True,
+    )
+    st.session_state["css_loaded"] = True
+
+st.set_page_config(
+    page_title="Визуализация многоканальных изображений",
+    page_icon="🎯",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
 @st.cache_resource(show_spinner="…")
@@ -53,14 +55,12 @@ def get_sheet() -> gspread.Worksheet:
     )
     return gc.open("human_study_results").sheet1
 
-
 try:
     SHEET = get_sheet()
 except Exception:
-    SHEET = None  
+    SHEET = None
 
 log_q: queue.Queue[List] = queue.Queue()
-
 
 def _writer():
     while True:
@@ -72,13 +72,55 @@ def _writer():
             print("Sheets error:", e)
         log_q.task_done()
 
-
 threading.Thread(target=_writer, daemon=True).start()
 
+@st.cache_data(show_spinner=False)
+def load_img(url: str) -> bytes:
+    return requests.get(url, timeout=6).content
+
+def html_timer(total_sec: int, key: str = "", prefix: str = ""):
+    components.html(
+        f"""
+<div style="display:flex;gap:16px;height:70px">
+  <div style="position:relative;width:70px;height:70px">
+    <svg width="70" height="70">
+      <circle cx="35" cy="35" r="26" stroke="#444" stroke-width="6" fill="none"/>
+      <circle id="bar-{key}" cx="35" cy="35" r="26" stroke="#52b788" stroke-width="6" fill="none"
+              stroke-dasharray="163.36" stroke-dashoffset="0" transform="rotate(-90 35 35)"/>
+    </svg>
+    <span id="lbl-{key}" style="position:absolute;top:50%;left:50%;
+          transform:translate(-50%,-50%);font:700 1.2rem sans-serif;color:#52b788">
+      {total_sec}
+    </span>
+  </div>
+  {"<div style='font:500 1rem sans-serif;color:#52b788;align-self:center;' id='txt-"+key+"'>"+prefix+str(total_sec)+" с</div>" if prefix else ""}
+</div>
+<script>
+(function () {{
+  const dash = 163.36;
+  const ttl  = {total_sec};
+  let left = ttl;
+  const bar = document.getElementById("bar-{key}");
+  const lbl = document.getElementById("lbl-{key}");
+  const txt = document.getElementById("txt-{key}");
+  function tick() {{
+    left -= 1;
+    if (left < 0) return;
+    lbl.textContent = left;
+    bar.style.strokeDashoffset = dash * (1 - left/ttl);
+    if (txt) txt.textContent = "{prefix}" + left + " с";
+    setTimeout(tick, 1000);
+  }}
+  setTimeout(tick, 1000);
+}})();
+</script>
+""",
+        height=80,
+    )
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15
-INTRO_TIME = 8           
+INTRO_TIME = 8
 
 GROUPS = [
     "img1_dif_corners",
@@ -109,7 +151,6 @@ LETTER_ANS = {
     "img5_same_corners": "юэы",
 }
 
-
 def file_url(g: str, a: str) -> str:
     return f"{BASE_URL}/{g}_{a}.png"
 
@@ -138,7 +179,6 @@ def make_questions() -> List[Dict]:
         )
     for lst in per_group.values():
         random.shuffle(lst)
-
     ordered = []
     while any(per_group.values()):
         cycle = list(GROUPS)
@@ -149,7 +189,6 @@ def make_questions() -> List[Dict]:
     for n, q in enumerate(ordered, 1):
         q["№"] = n
     return ordered
-
 
 if "questions" not in st.session_state:
     st.session_state.update(
@@ -163,7 +202,6 @@ if "questions" not in st.session_state:
 
 qs = st.session_state.questions
 total_q = len(qs)
-
 
 if not st.session_state.name:
     st.markdown(
@@ -199,10 +237,8 @@ if not st.session_state.name:
         st.experimental_rerun()
     st.stop()
 
-
 def letters_set(s: str) -> set[str]:
     return set(re.sub(r"[ ,.;:-]+", "", s.lower()))
-
 
 def finish(ans: str):
     q = qs[st.session_state.idx]
@@ -241,21 +277,15 @@ def finish(ans: str):
     st.session_state.q_start = None
     st.experimental_rerun()
 
-
-
 i = st.session_state.idx
 if i < total_q:
     q = qs[i]
-
-
     intro_limit = 8 if i < 5 else 2
     if st.session_state.phase == "intro":
         if st.session_state.intro_start is None:
             st.session_state.intro_start = time.time()
-        elapsed = time.time() - st.session_state.intro_start
-        left_intro = max(int(intro_limit - elapsed), 0)
-        st_autorefresh(interval=500, key=f"intro{i}")
-
+        html_timer(intro_limit, key=f"intro{i}", prefix="Начало показа через ")
+        st_autorefresh(interval=int(intro_limit * 1000) + 200, limit=1, key=f"intro-refresh-{i}")
         if q["qtype"] == "corners":
             st.markdown(
                 """
@@ -279,47 +309,17 @@ if i < total_q:
 </div>""",
                 unsafe_allow_html=True,
             )
-        st.markdown(f"**Начало показа через&nbsp;{left_intro} с**")
-        if elapsed >= intro_limit:
-            st.session_state.phase = "question"
-            st.session_state.q_start = None
-            st.experimental_rerun()
         st.stop()
-
-
     if st.session_state.q_start is None:
         st.session_state.q_start = time.time()
-    elapsed_q = time.time() - st.session_state.q_start
-    left = max(TIME_LIMIT - int(elapsed_q), 0)
-    st_autorefresh(interval=1000, key=f"q{i}")
-
-    components.html(
-        f"""
-<div style="display:flex;gap:16px;height:70px">
-  <div style="position:relative;width:70px;height:70px">
-    <svg width="70" height="70">
-      <circle cx="35" cy="35" r="26" stroke="#444" stroke-width="6" fill="none"/>
-      <circle cx="35" cy="35" r="26" stroke="#52b788" stroke-width="6" fill="none"
-              stroke-dasharray="163.36"
-              stroke-dashoffset="{163.36 * (left / 15)}"
-              transform="rotate(-90 35 35)"/>
-    </svg>
-    <span style="position:absolute;top:50%;left:50%;
-          transform:translate(-50%,-50%);font:700 1.2rem sans-serif;color:#52b788">
-      {left}
-    </span>
-  </div>
-</div>
-""",
-        height=80,
-    )
-
+    left = max(TIME_LIMIT - int(time.time() - st.session_state.q_start), 0)
+    html_timer(TIME_LIMIT, key=f"q{i}")
+    st_autorefresh(interval=(TIME_LIMIT * 1000) + 200, limit=1, key=f"q-refresh-{i}")
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
     if left > 0:
-        st.image(q["img"], width=290, clamp=True)
+        st.image(load_img(q["img"]), width=290, clamp=True)
     else:
         st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
-
     if q["qtype"] == "corners":
         sel = st.radio(
             q["prompt"],
@@ -346,10 +346,7 @@ if i < total_q:
             finish("Не вижу")
         if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
             finish(txt.strip())
-
-
 else:
-
     st.markdown("""
     <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
                  color:#fff;background:#262626;border-radius:12px;">
