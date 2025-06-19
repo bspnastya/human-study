@@ -1,23 +1,10 @@
 from __future__ import annotations
-import random
-import time
-import datetime
-import secrets
-import threading
-import queue
-import re
-import itertools
-import io
-from typing import List, Dict
-
-import requests
-import streamlit as st
-import streamlit.components.v1 as components
 from streamlit_autorefresh import st_autorefresh
-
+import random, time, datetime, secrets, threading, queue, re, itertools
+from typing import List, Dict
+import streamlit as st, streamlit.components.v1 as components
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from PIL import Image
 
 st.set_page_config(
     page_title="Визуализация многоканальных изображений",
@@ -25,11 +12,8 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed",
 )
-
-
-if not st.session_state.get("css_loaded", False):
-    st.markdown(
-        """
+st.markdown(
+    """
 <style>
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
   background:#808080!important;color:#111!important;}
@@ -53,16 +37,46 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
   данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>
 """,
-        unsafe_allow_html=True,
+    unsafe_allow_html=True,
+)
+
+@st.cache_resource(show_spinner="…")
+def get_sheet() -> gspread.Worksheet:
+    scopes = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    creds_dict = dict(st.secrets["gsp"])
+    gc = gspread.authorize(
+        ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
     )
-    st.session_state.css_loaded = True
+    return gc.open("human_study_results").sheet1
+
+try:
+    SHEET = get_sheet()
+except Exception:
+    SHEET = None 
+
+log_q: queue.Queue[List] = queue.Queue()
+
+
+def _writer():
+    while True:
+        row = log_q.get()
+        try:
+            if SHEET:
+                SHEET.append_row(row)
+        except Exception as e:
+            print("Sheets error:", e)
+        log_q.task_done()
+
+
+threading.Thread(target=_writer, daemon=True).start()
 
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15         
-INTRO_TIME_FIRST = 8     
-INTRO_TIME_OTHER = 2    
-BATCH_SIZE = 20         
+INTRO_TIME = 8 
 
 GROUPS = [
     "img1_dif_corners",
@@ -93,136 +107,45 @@ LETTER_ANS = {
     "img5_same_corners": "юэы",
 }
 
-
-log_q: queue.Queue[List] = queue.Queue()
-
-@st.cache_resource(show_spinner="…")
-def get_sheet() -> gspread.Worksheet | None:
-    scopes = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    try:
-        creds_dict = dict(st.secrets["gsp"])
-        client = gspread.authorize(
-            ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
-        )
-        return client.open("human_study_results").sheet1
-    except Exception as e:
-        print("Sheets init error:", e)
-        return None
-
-SHEET = get_sheet()
-
-
-
-def _writer():
-    batch: list[list] = []
-    while True:
-        row = log_q.get()
-        batch.append(row)
-        if len(batch) >= BATCH_SIZE or log_q.empty():
-            if SHEET: 
-                try:
-                    SHEET.append_rows(batch)
-                    batch.clear()
-                except Exception as e:
-                    print("Sheets write error:", e)
-        log_q.task_done()
-
-@st.cache_resource
-def start_writer_thread():
-    t = threading.Thread(target=_writer, daemon=True)
-    t.start()
-    return t
-
-start_writer_thread()
-
-
-
-def file_url(group: str, alg: str) -> str:
-    return f"{BASE_URL}/{group}_{alg}.png"
-
+def file_url(g: str, a: str) -> str:
+    return f"{BASE_URL}/{g}_{a}.png"
 
 def make_questions() -> List[Dict]:
-
     per_group: dict[str, list] = {g: [] for g in GROUPS}
     for g, a in itertools.product(GROUPS, ALGS):
-        per_group[g] += [
-            {
-                "group": g,
-                "alg": a,
-                "img": file_url(g, a),
-                "qtype": "corners",
-                "prompt": (
-                    "Правый верхний и левый нижний угол — одного цвета?"
-                ),
-                "correct": CORNER_ANS[g],
-            },
-            {
-                "group": g,
-                "alg": a,
-                "img": file_url(g, a),
-                "qtype": "letters",
-                "prompt": (
-                    "Если на изображении вы видите буквы, то укажите, какие именно."
-                ),
-                "correct": LETTER_ANS[g],
-            },
-        ]
+        per_group[g].append(
+            dict(
+                group=g,
+                alg=a,
+                img=file_url(g, a),
+                qtype="corners",
+                prompt="Правый верхний и левый нижний угол — одного цвета?",
+                correct=CORNER_ANS[g],
+            )
+        )
+        per_group[g].append(
+            dict(
+                group=g,
+                alg=a,
+                img=file_url(g, a),
+                qtype="letters",
+                prompt="Если на изображении вы видите буквы, то укажите, какие именно.",
+                correct=LETTER_ANS[g],
+            )
+        )
     for lst in per_group.values():
         random.shuffle(lst)
 
-    ordered: list[Dict] = []
+    ordered = []
     while any(per_group.values()):
         cycle = list(GROUPS)
         random.shuffle(cycle)
         for g in cycle:
             if per_group[g]:
                 ordered.append(per_group[g].pop())
-
     for n, q in enumerate(ordered, 1):
         q["№"] = n
     return ordered
-
-
-@st.cache_data(show_spinner=False)
-def load_img(url: str) -> Image.Image:
-   
-    resp = requests.get(url, timeout=5)
-    resp.raise_for_status()
-    return Image.open(io.BytesIO(resp.content))
-
-
-def letters_set(s: str) -> set[str]:
-    return set(re.sub(r"[ ,.;:-]+", "", s.lower()))
-
-
-def write_answer(q: Dict, ans: str, ms: int, ok: bool):
-   
-    if SHEET:
-        log_q.put(
-            [
-                datetime.datetime.utcnow().isoformat(),
-                st.session_state.name,
-                q["№"],
-                q["group"],
-                q["alg"],
-                q["qtype"],
-                q["prompt"],
-                ans or "—",
-                q["correct"],
-                ms,
-                ok,
-            ]
-        )
-  
-    q.update({
-        "ответ": ans or "—",
-        "время, мс": f"{ms:,}",
-        "✓": "✅" if ok else "❌",
-    })
-
 
 
 if "questions" not in st.session_state:
@@ -236,8 +159,7 @@ if "questions" not in st.session_state:
     )
 
 qs = st.session_state.questions
-TOTAL_Q = len(qs)
-
+total_q = len(qs)
 
 if not st.session_state.name:
     st.markdown(
@@ -245,24 +167,23 @@ if not st.session_state.name:
 <div style="color:#111;">
   <h2>Уважаемый участник,<br>добро пожаловать в эксперимент по изучению восприятия изображений.</h2>
   <p><b>Как проходит эксперимент</b><br>
-     В ходе эксперимента вам нужно будет отвечать на простые вопросы об изображениях,
-     которые вы увидите на экране. Всего вам предстоит ответить на <b>40</b> вопросов.
-     Прохождение теста займет около 10‑15 минут.</p>
+     В ходе эксперимента вам нужно будет отвечать на простые вопросы об изображениях, 
+     которые вы увидите на экране. Всего вам предстоит ответить на <b>40</b> вопросов. 
+     Прохождение теста займет около 10-15 минут.</p>
   <p><b>Что это за изображения?</b><br>
-     Изображения — результат работы разных методов.
-     Ни одно из них не является «эталоном».
+     Изображения — результат работы разных методов. 
+     Ни одно из них не является «эталоном». 
      Цель эксперимента — понять, какие методы обработки лучше сохраняют информацию.</p>
   <p><b>Важно</b><br>
-     Эксперимент полностью анонимен.
-     Проходить его следует <b>только на компьютере или ноутбуке</b>:
+     Эксперимент полностью анонимен.  
+     Проходить его следует <b>только на компьютере или ноутбуке</b>:  
      использование телефонов или планшетов запрещено.</p>
-  <p>Для начала теста введите любой псевдоним и нажмите Enter
+  <p>Для начала теста введите любой псевдоним и нажмите Enter  
      или нажмите «Сгенерировать псевдоним».</p>
 </div>
 """,
         unsafe_allow_html=True,
     )
-
     uname = st.text_input(
         "", placeholder="Фамилия / псевдоним", key="username", label_visibility="collapsed"
     )
@@ -275,48 +196,76 @@ if not st.session_state.name:
     st.stop()
 
 
-i = st.session_state.idx
-if i >= TOTAL_Q:
-    st.markdown(
-        """
-        <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
-                     color:#fff;background:#262626;border-radius:12px;">
-            Вы завершили прохождение.<br><b>Спасибо за участие!</b>
-        </div>
-        """,
-        unsafe_allow_html=True,
+def letters_set(s: str) -> set[str]:
+    return set(re.sub(r"[ ,.;:-]+", "", s.lower()))
+
+
+def finish(ans: str):
+    q = qs[st.session_state.idx]
+    ms = int((time.time() - st.session_state.q_start) * 1000) if st.session_state.q_start else 0
+    ok = (
+        letters_set(ans) == letters_set(q["correct"])
+        if q["qtype"] == "letters"
+        else ans.lower() == q["correct"].lower()
     )
-    st.balloons()
-    st.stop()
+    if SHEET:
+        log_q.put(
+            [
+                datetime.datetime.utcnow().isoformat(),
+                st.session_state.name,
+                q["№"],
+                q["group"],
+                q["alg"],
+                q["qtype"],
+                q["prompt"],
+                ans,
+                q["correct"],
+                ms,
+                ok,
+            ]
+        )
+    q.update(
+        {
+            "ответ": ans or "—",
+            "время, мс": f"{ms:,}",
+            "✓": "✅" if ok else "❌",
+        }
+    )
+    st.session_state.idx += 1
+    st.session_state.phase = "intro"
+    st.session_state.intro_start = None
+    st.session_state.q_start = None
+    st.experimental_rerun()
 
-q = qs[i]
 
 
-intro_limit = INTRO_TIME_FIRST if i < 5 else INTRO_TIME_OTHER
+i = st.session_state.idx
+if i < total_q:
+    q = qs[i]
 
-if st.session_state.phase == "intro":
-    if st.session_state.intro_start is None:
-        st.session_state.intro_start = time.time()
-    elapsed_intro = time.time() - st.session_state.intro_start
-    left_intro = max(int(intro_limit - elapsed_intro), 0)
 
- 
-    st_autorefresh(interval=1000, key=f"intro{i}")
+    intro_limit = 8 if i < 5 else 2
+    if st.session_state.phase == "intro":
+        if st.session_state.intro_start is None:
+            st.session_state.intro_start = time.time()
+        elapsed = time.time() - st.session_state.intro_start
+        left_intro = max(int(intro_limit - elapsed), 0)
+        st_autorefresh(interval=500, key=f"intro{i}")
 
-    if q["qtype"] == "corners":
-        st.markdown(
-            """
+        if q["qtype"] == "corners":
+            st.markdown(
+                """
 <div style="font-size:1.1rem;">
 Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
 диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
 и определить, окрашены ли они в один цвет.<br><br>
 Картинка будет доступна в течение <b>15&nbsp;секунд</b>. Время на ответ не ограничено.
 </div>""",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            """
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                """
 <div style="font-size:1.1rem;">
 Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
 представленной картинке <b>буквы русского алфавита</b>.
@@ -324,36 +273,31 @@ if st.session_state.phase == "intro":
 пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>
 На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.
 </div>""",
-            unsafe_allow_html=True,
-        )
-    st.markdown(f"**Начало показа через {left_intro} с**")
-
-    if elapsed_intro >= intro_limit:
-        st.session_state.phase = "question"
-        st.session_state.q_start = None  # сбросим для точного таймера отображения
-        st.experimental_rerun()
-    st.stop()
-
-
-if st.session_state.q_start is None:
-    st.session_state.q_start = time.time()
-
-elapsed_q = time.time() - st.session_state.q_start
-left = max(TIME_LIMIT - int(elapsed_q), 0)
+                unsafe_allow_html=True,
+            )
+        st.markdown(f"**Начало показа через&nbsp;{left_intro} с**")
+        if elapsed >= intro_limit:
+            st.session_state.phase = "question"
+            st.session_state.q_start = None
+            st.experimental_rerun()
+        st.stop()
 
 
-st_autorefresh(interval=1000, key=f"q{i}")
+    if st.session_state.q_start is None:
+        st.session_state.q_start = time.time()
+    elapsed_q = time.time() - st.session_state.q_start
+    left = max(TIME_LIMIT - int(elapsed_q), 0)
+    st_autorefresh(interval=1000, key=f"q{i}")
 
-
-components.html(
-    f"""
+    components.html(
+        f"""
 <div style="display:flex;gap:16px;height:70px">
   <div style="position:relative;width:70px;height:70px">
     <svg width="70" height="70">
       <circle cx="35" cy="35" r="26" stroke="#444" stroke-width="6" fill="none"/>
       <circle cx="35" cy="35" r="26" stroke="#52b788" stroke-width="6" fill="none"
               stroke-dasharray="163.36"
-              stroke-dashoffset="{163.36 * (left / TIME_LIMIT):.2f}"
+              stroke-dashoffset="{163.36 * (left / 15)}"
               transform="rotate(-90 35 35)"/>
     </svg>
     <span style="position:absolute;top:50%;left:50%;
@@ -363,59 +307,48 @@ components.html(
   </div>
 </div>
 """,
-    height=80,
-)
-
-
-st.markdown(f"### Вопрос №{q['№']} из {TOTAL_Q}")
-
-if left > 0:
-    st.image(load_img(q["img"]), width=290, clamp=True)
-else:
-    st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
-
-
-
-def finish(ans: str):
-    ms = int((time.time() - st.session_state.q_start) * 1000)
-    ok = (
-        letters_set(ans) == letters_set(q["correct"])
-        if q["qtype"] == "letters"
-        else ans.lower() == q["correct"].lower()
+        height=80,
     )
-    write_answer(q, ans, ms, ok)
 
+    st.markdown(f"### Вопрос №{q['№']} из {total_q}")
+    if left > 0:
+        st.image(q["img"], width=290, clamp=True)
+    else:
+        st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
 
-    st.session_state.idx += 1
-    st.session_state.phase = "intro"
-    st.session_state.intro_start = None
-    st.session_state.q_start = None
-    st.experimental_rerun()
+    if q["qtype"] == "corners":
+        sel = st.radio(
+            q["prompt"],
+            (
+                "Да, углы одного цвета.",
+                "Нет, углы окрашены в разные цвета.",
+                "Затрудняюсь ответить.",
+            ),
+            index=None,
+            key=f"radio{i}",
+        )
+        if sel:
+            if sel.startswith("Да"):
+                finish("да")
+            elif sel.startswith("Нет"):
+                finish("нет")
+            else:
+                finish("затрудняюсь")
+    else:
+        txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
+        if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+            st.error("Допустимы только русские буквы и знаки пунктуации.")
+        if st.button("Не вижу букв", key=f"skip{i}"):
+            finish("Не вижу")
+        if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+            finish(txt.strip())
 
-if q["qtype"] == "corners":
-    sel = st.radio(
-        q["prompt"],
-        (
-            "Да, углы одного цвета.",
-            "Нет, углы окрашены в разные цвета.",
-            "Затрудняюсь ответить.",
-        ),
-        index=None,
-        key=f"radio{i}",
-    )
-    if sel:
-        if sel.startswith("Да"):
-            finish("да")
-        elif sel.startswith("Нет"):
-            finish("нет")
-        else:
-            finish("затрудняюсь")
 else:
-    txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
-    if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-        st.error("Допустимы только русские буквы и знаки пунктуации.")
-    if st.button("Не вижу букв", key=f"skip{i}"):
-        finish("Не вижу")
-    if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-        finish(txt.strip())
 
+    st.markdown("""
+    <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
+                 color:#fff;background:#262626;border-radius:12px;">
+        Вы завершили прохождение.<br><b>Спасибо за участие!</b>
+    </div>
+    """, unsafe_allow_html=True)
+    st.balloons()
