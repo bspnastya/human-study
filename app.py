@@ -118,6 +118,7 @@ def html_timer(total_sec: int, key: str = "", prefix: str = ""):
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15
+INTRO_TIME = 8
 
 GROUPS = [
     "img1_dif_corners",
@@ -282,14 +283,17 @@ if i < total_q:
         if st.session_state.intro_start is None:
             st.session_state.intro_start = time.time()
         elapsed_intro = time.time() - st.session_state.intro_start
-        remain_intro = max(intro_limit - elapsed_intro, 0)
-        html_timer(int(remain_intro), key=f"intro{i}", prefix="Начало показа через ")
-        if remain_intro <= 0:
+        remain_intro = max(intro_limit - int(elapsed_intro), 0)
+        html_timer(remain_intro if remain_intro > 0 else 0, key=f"intro{i}", prefix="Начало показа через ")
+        
+        if elapsed_intro >= intro_limit:
             st.session_state.phase = "question"
             st.session_state.q_start = None
             st.session_state.intro_start = None
             st.experimental_rerun()
-        st_autorefresh(interval=500, key=f"intro-refresh-{i}")
+        else:
+            st_autorefresh(interval=1000, key=f"intro-refresh-{i}")
+        
         if q["qtype"] == "corners":
             st.markdown(
                 """
@@ -314,45 +318,50 @@ if i < total_q:
                 unsafe_allow_html=True,
             )
         st.stop()
-    if st.session_state.q_start is None:
-        st.session_state.q_start = time.time()
-    left = max(TIME_LIMIT - (time.time() - st.session_state.q_start), 0)
-    html_timer(int(left), key=f"q{i}")
-    if left <= 0:
-        st_autorefresh(interval=200, key=f"q-end-{i}")
-    else:
-        st_autorefresh(interval=int(left * 1000) + 200, key=f"q-end-{i}")
-    st.markdown(f"### Вопрос №{q['№']} из {total_q}")
-    if left > 0:
-        st.image(load_img(q["img"]), width=290, clamp=True)
-    else:
-        st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
-    if q["qtype"] == "corners":
-        sel = st.radio(
-            q["prompt"],
-            (
-                "Да, углы одного цвета.",
-                "Нет, углы окрашены в разные цвета.",
-                "Затрудняюсь ответить.",
-            ),
-            index=None,
-            key=f"radio{i}",
-        )
-        if sel:
-            if sel.startswith("Да"):
-                finish("да")
-            elif sel.startswith("Нет"):
-                finish("нет")
-            else:
-                finish("затрудняюсь")
-    else:
-        txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
-        if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-            st.error("Допустимы только русские буквы и знаки пунктуации.")
-        if st.button("Не вижу букв", key=f"skip{i}"):
-            finish("Не вижу")
-        if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-            finish(txt.strip())
+    
+    if st.session_state.phase == "question":
+        if st.session_state.q_start is None:
+            st.session_state.q_start = time.time()
+        
+        elapsed_q = time.time() - st.session_state.q_start
+        left = max(TIME_LIMIT - int(elapsed_q), 0)
+        
+        html_timer(left if left > 0 else 0, key=f"q{i}")
+        st_autorefresh(interval=1000, key=f"q-refresh-{i}")
+        
+        st.markdown(f"### Вопрос №{q['№']} из {total_q}")
+        if left > 0:
+            st.image(load_img(q["img"]), width=290, clamp=True)
+        else:
+            st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
+        
+        if q["qtype"] == "corners":
+            sel = st.radio(
+                q["prompt"],
+                (
+                    "Да, углы одного цвета.",
+                    "Нет, углы окрашены в разные цвета.",
+                    "Затрудняюсь ответить.",
+                ),
+                index=None,
+                key=f"radio{i}",
+            )
+            if sel:
+                if sel.startswith("Да"):
+                    finish("да")
+                elif sel.startswith("Нет"):
+                    finish("нет")
+                else:
+                    finish("затрудняюсь")
+        else:
+            txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
+            if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+                st.error("Допустимы только русские буквы и знаки пунктуации.")
+            if st.button("Не вижу букв", key=f"skip{i}"):
+                finish("Не вижу")
+            if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+                finish(txt.strip())
+
 else:
     st.markdown("""
     <div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
@@ -361,7 +370,6 @@ else:
     </div>
     """, unsafe_allow_html=True)
     st.balloons()
-
 
 
 
