@@ -66,8 +66,8 @@ def _writer():
         try:
             if SHEET:
                 SHEET.append_row(row)
-        except Exception as e:
-            print("Sheets error:", e)
+        except Exception:
+            pass
         log_q.task_done()
 
 threading.Thread(target=_writer, daemon=True).start()
@@ -281,15 +281,14 @@ if i < total_q:
     if st.session_state.phase == "intro":
         if st.session_state.intro_start is None:
             st.session_state.intro_start = time.time()
-        elapsed_intro = time.time() - st.session_state.intro_start
-        remain_intro = max(intro_limit - elapsed_intro, 0)
+        remain_intro = max(intro_limit - (time.time() - st.session_state.intro_start), 0)
         html_timer(int(remain_intro), key=f"intro{i}", prefix="Начало показа через ")
         if remain_intro <= 0:
             st.session_state.phase = "question"
             st.session_state.q_start = None
             st.session_state.intro_start = None
             st.experimental_rerun()
-        st_autorefresh(interval=500, key=f"intro-tick-{i}")
+        st_autorefresh(interval=int(remain_intro * 1000) + 100, limit=1, key=f"intro-rerun-{i}")
         if q["qtype"] == "corners":
             st.markdown(
                 """
@@ -319,7 +318,7 @@ if i < total_q:
     left = max(TIME_LIMIT - (time.time() - st.session_state.q_start), 0)
     html_timer(int(left), key=f"q{i}")
     if left > 0:
-        st_autorefresh(interval=500, key=f"q-tick-{i}")
+        st_autorefresh(interval=int(left * 1000) + 100, limit=1, key=f"q-rerun-{i}")
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
     if left > 0:
         st.image(load_img(q["img"]), width=290, clamp=True)
@@ -359,6 +358,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
     st.balloons()
+
 
 
 
