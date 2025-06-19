@@ -187,6 +187,144 @@ if not st.session_state.name:
   <h2>Уважаемый участник,<br>добро пожаловать в эксперимент по изучению восприятия изображений.</h2>
   <p><b>Как проходит эксперимент</b><br>
      В ходе эксперимента вам нужно будет отвечать на простые вопросы об изображениях,
-     которые вы увидите на экране. Вс
+     которые вы увидите на экране. Всего вам предстоит ответить на <b>40</b> вопросов.
+     Прохождение теста займет около 10-15 минут.</p>
+  <p><b>Что это за изображения?</b><br>
+     Изображения — результат работы разных методов.
+     Ни одно из них не является «эталоном».
+     Цель эксперимента — понять, какие методы обработки лучше сохраняют информацию.</p>
+  <p><b>Важно</b><br>
+     Эксперимент полностью анонимен.
+     Проходить его следует <b>только на компьютере или ноутбуке</b>:
+     использование телефонов или планшетов запрещено.</p>
+  <p>Для начала теста введите любой псевдоним и нажмите Enter
+     или нажмите «Сгенерировать псевдоним».</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    uname = st.text_input("", placeholder="Фамилия / псевдоним", key="username",
+                         label_visibility="collapsed")
+    if st.button("🎲 Сгенерировать псевдоним"):
+        st.session_state.name = f"Участник_{secrets.randbelow(900_000)+100_000}"
+        st.experimental_rerun()
+    if uname:
+        st.session_state.name = uname.strip()
+        st.experimental_rerun()
+    st.stop()
+
+
+if st.session_state.idx >= TOTAL_Q:
+    st.markdown(
+        """<div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;
+                 color:#fff;background:#262626;border-radius:12px;">
+            Вы завершили прохождение.<br><b>Спасибо за участие!</b>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+    st.balloons()
+    st.stop()
+
+
+q = qs[st.session_state.idx]
+intro_limit = INTRO_FIRST if st.session_state.idx < 5 else INTRO_OTHER
+
+
+if st.session_state.phase == "intro":
+    if st.session_state.intro_start is None:
+        st.session_state.intro_start = time.time()
+    left_intro = max(int(intro_limit - (time.time() - st.session_state.intro_start)), 0)
+
+    if q["qtype"] == "corners":
+        st.markdown(
+            """<div style="font-size:1.1rem;">Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
+диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
+и определить, окрашены ли они в один цвет.<br><br>
+Картинка будет доступна в течение <b>15&nbsp;секунд</b>. Время на ответ не ограничено.</div>""",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """<div style="font-size:1.1rem;">Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
+представленной картинке <b>буквы русского алфавита</b>.
+Найденные буквы необходимо ввести в текстовое поле: допускается разделение
+пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>
+На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.</div>""",
+            unsafe_allow_html=True,
+        )
+    st.markdown(f"**Начало показа через {left_intro} с**")
+
+    if left_intro == 0:
+        st.session_state.phase = "question"
+        st.session_state.q_start = None
+        st.experimental_rerun()
+    st.stop()
+
+if st.session_state.q_start is None:
+    st.session_state.q_start = time.time()
+
+st.markdown(f"### Вопрос №{q['№']} из {TOTAL_Q}")
+
+components.html(
+    f"""
+<div style='display:flex;flex-direction:column;gap:8px'>
+  <!-- Таймер с окружностью -->
+  <div id='timerwrap' data-limit='{TIME_LIMIT}' style='position:relative;width:70px;height:70px'>
+    <svg width='70' height='70'>
+      <circle cx='35' cy='35' r='26' stroke='#444' stroke-width='6' fill='none'/>
+      <circle id='arc' cx='35' cy='35' r='26' stroke='#52b788' stroke-width='6' fill='none'
+              stroke-dasharray='163.36' stroke-dashoffset='0' transform='rotate(-90 35 35)'/>
+    </svg>
+    <span id='num' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:700 1.2rem sans-serif;color:#52b788'>{TIME_LIMIT}</span>
+  </div>
+
+  <img id='stimulus' src='{q['img']}' width='290' style='max-width:100%;border:1px solid #555;border-radius:6px'/>
+</div>
+<script>
+(function(){{
+  const limit = {TIME_LIMIT};
+  let left   = limit;
+  const dash = 163.36;
+  const arc  = document.getElementById('arc');
+  const num  = document.getElementById('num');
+  const img  = document.getElementById('stimulus');
+  const tick = setInterval(()=>{{
+      left -= 1;
+      if(left<0) left = 0;
+      num.textContent = left;
+      arc.style.strokeDashoffset = (dash*(left/limit)).toFixed(2);
+      if(left===0) {{
+          img.style.display='none';
+          clearInterval(tick);
+      }}
+  }},1000);
+}})();
+</script>
+""",
+    height=380,
+)
+
+if q["qtype"] == "corners":
+    выбор = st.radio(q["prompt"], (
+        "Да, углы одного цвета.",
+        "Нет, углы окрашены в разные цвета.",
+        "Затрудняюсь ответить.",
+    ), index=None, key=f"radio{q['№']}")
+    if выбор:
+        if выбор.startswith("Да"):
+            finish("да", q)
+        elif выбор.startswith("Нет"):
+            finish("нет", q)
+        else:
+            finish("затрудняюсь", q)
+else:
+    txt = st.text_input(q["prompt"], key=f"in{q['№']}", placeholder="Введите русские буквы")
+    if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+        st.error("Допустимы только русские буквы и знаки пунктуации.")
+    if st.button("Не вижу букв", key=f"skip{q['№']}"):
+        finish("Не вижу", q)
+    if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
+        finish(txt.strip(), q)
+
 
 
