@@ -196,7 +196,9 @@ if st.session_state.phase == "intro":
     intro_limit = 8 if i < 5 else 3
     remain = intro_limit - (time.time() - st.session_state.start_time)
     remain = max(remain, 0)
+
     render_timer_js(math.ceil(remain), f"intro{i}")
+
     if q["qtype"] == "corners":
         st.markdown(
             """
@@ -222,15 +224,21 @@ if st.session_state.phase == "intro":
 </div>""",
             unsafe_allow_html=True,
         )
-    if remain > 0:
-        st_autorefresh(interval=250, key=f"intro_refresh_{i}")
-        st.stop()
-    else:
-        if st.button("Перейти к вопросу", key=f"next{i}"):
-            st.session_state.phase = "question"
-            st.session_state.start_time = None
-            st.rerun()
-        st.stop()
+
+    go_val = components.html(f"""
+    <button id="btn{i}" style="display:none;margin-top:24px;padding:12px 24px;font-size:1rem;border:1px solid #555;background:#222;color:#fff;border-radius:8px;cursor:pointer;">Перейти к вопросу</button>
+    <script>
+      const b=document.getElementById("btn{i}");
+      setTimeout(()=>{{b.style.display='inline-block';}}, {int(remain*1000)});
+      b.onclick=()=>{{window.parent.postMessage({{type:'streamlit:setComponentValue',value:true}},'*');}};
+    </script>
+    """, height=80)
+
+    if go_val:
+        st.session_state.phase = "question"
+        st.session_state.start_time = None
+        st.rerun()
+    st.stop()
 
 if st.session_state.start_time is None:
     st.session_state.start_time = time.time()
@@ -243,7 +251,8 @@ placeholder = st.empty()
 if left > 0:
     placeholder.image(q["img"], width=290, clamp=True)
 else:
-    placeholder.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
+    placeholder.markdown("<i>Время показа изображения истекло.</i>",
+                         unsafe_allow_html=True)
 
 if q["qtype"] == "corners":
     sel = st.radio(q["prompt"],
@@ -261,6 +270,7 @@ else:
         finish("Не вижу")
     if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
         finish(txt.strip())
+
 
 
 
