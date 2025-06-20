@@ -7,6 +7,50 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 st.set_page_config(page_title="Визуализация многоканальных изображений", page_icon="🎯", layout="centered", initial_sidebar_state="collapsed")
+
+
+def render_timer_js(remaining_time: int, timer_key: str):
+    timer_html = f"""
+    <div id="timer-{timer_key}" style="font-size: 1.2rem; font-weight: bold; color: #111; margin-bottom: 10px;">
+        Осталось времени: <span id="time-{timer_key}">{remaining_time}</span> сек
+    </div>
+    <script>
+    (function() {{
+        const timerId = 'timer-{timer_key}';
+        const timeId = 'time-{timer_key}';
+        
+        
+        if (window['interval_' + timerId]) {{
+            clearInterval(window['interval_' + timerId]);
+        }}
+        
+        let timeLeft = {remaining_time};
+        const timeSpan = document.getElementById(timeId);
+        
+        window['interval_' + timerId] = setInterval(function() {{
+            timeLeft--;
+            if (timeSpan) {{
+                timeSpan.textContent = Math.max(0, timeLeft);
+            }}
+            
+            if (timeLeft <= 0) {{
+                clearInterval(window['interval_' + timerId]);
+           
+                setTimeout(() => {{ window.location.reload(); }}, 100);
+            }}
+        }}, 1000);
+        
+      
+        window.addEventListener('beforeunload', function() {{
+            if (window['interval_' + timerId]) {{
+                clearInterval(window['interval_' + timerId]);
+            }}
+        }});
+    }})();
+    </script>
+    """
+    components.html(timer_html, height=50)
+
 st.markdown("""
 <style>
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{background:#808080!important;color:#111!important;}
@@ -76,7 +120,6 @@ def make_questions() -> List[Dict]:
     for n, q in enumerate(seq, 1): q["№"] = n
     return seq
 
-
 if "questions" not in st.session_state:
     st.session_state.questions = make_questions()
     st.session_state.idx = 0
@@ -85,7 +128,6 @@ if "questions" not in st.session_state:
     st.session_state.start_time = None
 
 qs, total_q = st.session_state.questions, len(st.session_state.questions)
-
 
 if st.session_state.get("pause_until", 0) > time.time():
     st.markdown("**Переходим к следующему вопросу...**")
@@ -139,7 +181,6 @@ i = st.session_state.idx
 if i < total_q:
     q = qs[i]
 
-    
     if st.session_state.phase == "intro":
         if st.session_state.start_time is None:
             st.session_state.start_time = time.time()
@@ -149,12 +190,13 @@ if i < total_q:
         remain = max(intro_limit - int(elapsed), 0)
         
         if remain > 0:
-            st.markdown(f"**Начало показа через {remain} с**")
-            st_autorefresh(interval=1000, key=f"intro{i}")
+        
+            render_timer_js(remain, f"intro{i}")
             
             if q["qtype"] == "corners":
                 st.markdown("""
 <div style="font-size:1.1rem;">
+<b>Начало показа через указанное время</b><br><br>
 Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
 диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
 и определить, окрашены ли они в один цвет.<br><br>
@@ -163,6 +205,7 @@ if i < total_q:
             else:
                 st.markdown("""
 <div style="font-size:1.1rem;">
+<b>Начало показа через указанное время</b><br><br>
 Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
 представленной картинке <b>буквы русского алфавита</b>.
 Найденные буквы необходимо ввести в текстовое поле: допускается разделение
@@ -175,19 +218,17 @@ if i < total_q:
             st.session_state.start_time = time.time()
             st.rerun()
 
-  
+
     if st.session_state.start_time is None:
         st.session_state.start_time = time.time()
     
     elapsed = time.time() - st.session_state.start_time
     left = max(TIME_LIMIT - int(elapsed), 0)
     
-
-    st.markdown(f"**Осталось времени: {left} сек**")
-    if left > 0:
-        st_autorefresh(interval=1000, key=f"q{i}")
-    
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
+    
+
+    render_timer_js(left, f"q{i}")
     
     if left > 0:
         st.image(q["img"], width=290, clamp=True)
@@ -212,5 +253,4 @@ else:
     Вы завершили прохождение.<br><b>Спасибо за участие!</b>
 </div>""", unsafe_allow_html=True)
     st.balloons()
-
 
