@@ -84,7 +84,7 @@ def make_questions() -> List[Dict]:
         per[g].append(dict(group=g, alg=a, img=file_url(g, a), qtype="corners", prompt="Правый верхний и левый нижний угол — одного цвета?", correct=CORNER_ANS[g]))
         per[g].append(dict(group=g, alg=a, img=file_url(g, a), qtype="letters", prompt="Если на изображении вы видите буквы, то укажите, какие именно.", correct=LETTER_ANS[g]))
     for v in per.values(): random.shuffle(v)
-    seq = []; prev = None
+    seq, prev = [], None
     while any(per.values()):
         pick = [g for g in GROUPS if per[g] and g != prev] or [g for g in GROUPS if per[g]]
         g = random.choice(pick); seq.append(per[g].pop()); prev = g
@@ -195,6 +195,7 @@ left = max(TIME_LIMIT - int(elapsed), 0)
 st.markdown(f"### Вопрос №{q['№']} из {total_q}")
 render_timer_js(left, f"q{i}")
 if left > 0:
+    st_autorefresh(interval=1000, key=f"q_refresh_{i}")
     st.image(q["img"], width=290, clamp=True)
 else:
     st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
@@ -210,6 +211,7 @@ else:
         finish("Не вижу")
     if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt): 
         finish(txt.strip())
+
 
 
 
