@@ -9,48 +9,35 @@ from oauth2client.service_account import ServiceAccountCredentials
 st.set_page_config(page_title="Визуализация многоканальных изображений", page_icon="🎯", layout="centered", initial_sidebar_state="collapsed")
 
 
-def render_timer_js(remaining_time: int, timer_key: str, is_intro: bool = False):
-    timer_html = f"""
-    <div id="timer-{timer_key}" style="font-size: 1.2rem; font-weight: bold; color: #111; margin-bottom: 10px;">
-        Осталось времени: <span id="time-{timer_key}">{remaining_time}</span> сек
+def render_timer_js(remaining_time: int, timer_key: str,
+                    send_done: bool = False):
+   
+    return components.html(f"""
+    <div id="timer-{timer_key}"
+         style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px">
+        Осталось&nbsp;времени: <span id="time-{timer_key}">{remaining_time}</span>&nbsp;сек
     </div>
     <script>
-    (function() {{
-        const timerId = 'timer-{timer_key}';
-        const timeId = 'time-{timer_key}';
-        
+    (function () {{
  
-        if (window['interval_' + timerId]) {{
-            clearInterval(window['interval_' + timerId]);
-        }}
-        
-        let timeLeft = {remaining_time};
-        const timeSpan = document.getElementById(timeId);
-        
-        window['interval_' + timerId] = setInterval(function() {{
-            timeLeft--;
-            if (timeSpan) {{
-                timeSpan.textContent = Math.max(0, timeLeft);
-            }}
-            
-            if (timeLeft <= 0) {{
-                clearInterval(window['interval_' + timerId]);
-    
-                {'window.sessionStorage.setItem("phase_transition", "true");' if is_intro else ''}
-                setTimeout(() => {{ window.location.reload(); }}, 100);
+        if (window["int_{timer_key}"]) clearInterval(window["int_{timer_key}"]);
+
+        let left = {remaining_time};
+        const span = document.getElementById("time-{timer_key}");
+        window["int_{timer_key}"] = setInterval(() => {{
+            left--;
+            if (span) span.textContent = Math.max(0, left);
+
+            if (left <= 0) {{
+                clearInterval(window["int_{timer_key}"]);
+                { 'window.parent.postMessage({type:"streamlit:setComponentValue", value:true}, "*");'
+                  if send_done else '' }
             }}
         }}, 1000);
-        
-
-        window.addEventListener('beforeunload', function() {{
-            if (window['interval_' + timerId]) {{
-                clearInterval(window['interval_' + timerId]);
-            }}
-        }});
     }})();
     </script>
-    """
-    components.html(timer_html, height=50)
+    """, height=50, key=f"timer_{timer_key}")
+
 
 st.markdown("""
 <style>
@@ -206,13 +193,12 @@ if i < total_q:
         if st.session_state.start_time is None:
             st.session_state.start_time = time.time()
         
-        elapsed = time.time() - st.session_state.start_time
         intro_limit = 8 if i < 5 else 3
-        remain = max(intro_limit - int(elapsed), 0)
+        remain = intro_limit - int(time.time() - st.session_state.start_time)
         
         if remain > 0:
           
-            render_timer_js(remain, f"intro{i}", is_intro=True)
+            done = render_timer_js(remain, f"intro{i}", send_done=True)
             
             if q["qtype"] == "corners":
                 st.markdown("""
