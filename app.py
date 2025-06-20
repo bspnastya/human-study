@@ -187,7 +187,7 @@ if st.session_state.phase == "intro":
         st.rerun()
     st.stop()
 
-─
+
 if st.session_state.start_time is None: st.session_state.start_time = time.time()
 elapsed = time.time() - st.session_state.start_time
 left = max(TIME_LIMIT - math.floor(elapsed), 0)
