@@ -52,7 +52,7 @@ input[data-testid="stTextInput"]{
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
 
 
- *{
+ {
     -webkit-backface-visibility: hidden;
     -webkit-transform: translateZ(0) scale(1.0, 1.0);
     transform: translateZ(0);
