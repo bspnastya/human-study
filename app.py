@@ -195,7 +195,7 @@ left = max(TIME_LIMIT - int(elapsed), 0)
 st.markdown(f"### Вопрос №{q['№']} из {total_q}")
 render_timer_js(left, f"q{i}")
 if left > 0:
-    st_autorefresh(interval=1000, key=f"q_refresh_{i}")
+    st_autorefresh(interval=500, key=f"q_refresh_{i}")
     st.image(q["img"], width=290, clamp=True)
 else:
     st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
