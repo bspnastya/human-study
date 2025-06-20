@@ -19,7 +19,7 @@ def render_timer_js(remaining_time: int, timer_key: str, is_intro: bool = False)
         const timerId = 'timer-{timer_key}';
         const timeId = 'time-{timer_key}';
         
-      
+ 
         if (window['interval_' + timerId]) {{
             clearInterval(window['interval_' + timerId]);
         }}
@@ -35,13 +35,13 @@ def render_timer_js(remaining_time: int, timer_key: str, is_intro: bool = False)
             
             if (timeLeft <= 0) {{
                 clearInterval(window['interval_' + timerId]);
-               
+    
                 {'window.sessionStorage.setItem("phase_transition", "true");' if is_intro else ''}
                 setTimeout(() => {{ window.location.reload(); }}, 100);
             }}
         }}, 1000);
         
-   
+
         window.addEventListener('beforeunload', function() {{
             if (window['interval_' + timerId]) {{
                 clearInterval(window['interval_' + timerId]);
@@ -130,7 +130,7 @@ if "questions" not in st.session_state:
 
 
 if st.session_state.phase == "intro":
-  
+
     check_transition = components.html("""
     <script>
     const transition = window.sessionStorage.getItem("phase_transition");
@@ -211,7 +211,7 @@ if i < total_q:
         remain = max(intro_limit - int(elapsed), 0)
         
         if remain > 0:
-            
+          
             render_timer_js(remain, f"intro{i}", is_intro=True)
             
             if q["qtype"] == "corners":
@@ -239,6 +239,7 @@ if i < total_q:
             st.session_state.start_time = time.time()
             st.rerun()
 
+
     if st.session_state.start_time is None:
         st.session_state.start_time = time.time()
     
@@ -247,7 +248,7 @@ if i < total_q:
     
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
     
-    
+   
     render_timer_js(left, f"q{i}", is_intro=False)
     
     if left > 0:
