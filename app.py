@@ -8,7 +8,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 st.set_page_config(page_title="Визуализация многоканальных изображений", page_icon="🎯", layout="centered", initial_sidebar_state="collapsed")
 
-
 def render_timer_js(remaining_time: int, timer_key: str, is_intro: bool = False):
     timer_html = f"""
     <div id="timer-{timer_key}" style="font-size: 1.2rem; font-weight: bold; color: #111; margin-bottom: 10px;">
