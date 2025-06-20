@@ -422,7 +422,7 @@ else:
                 }}
             }}, {TIME_LIMIT * 1000});
             </script>
-            """, height=350)
+            """, height=320)
         else:
             st.markdown(
                 "<div style='text-align:left;font-style:italic;color:#666;padding:40px 0;'>"
