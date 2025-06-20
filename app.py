@@ -80,7 +80,7 @@ def letters_set(s: str) -> set[str]:
     return set(s)
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 17
+TIME_LIMIT = 16
 GROUPS = ["img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
           "img4_same_corners","img5_same_corners"]
 ALGS = ["pca_rgb_result","socolov_lab_result","socolov_rgb_result","umap_rgb_result"]
@@ -124,7 +124,9 @@ if "questions" not in st.session_state:
     st.session_state.pause_until = 0.0
 
 if st.session_state.get("pause_until", 0) > time.time():
-    st.markdown("**Переходим к следующему вопросу...**")
+    st.markdown("<div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;color:#fff;background:#262626;border-radius:12px;">
+    Переходим к следующему вопросу....
+</div>")
     st_autorefresh(interval=1000, key="pause")
     st.stop()
 
@@ -221,9 +223,11 @@ if st.session_state.phase == "intro":
                 """
 <div style="font-size:1.1rem;">
 <b>Начало показа через указанное время</b><br><br>
-Сейчас вы увидите изображение. Цель — определить, есть ли
-на нём <b>буквы русского алфавита</b>. Найденные буквы введите
-в текстовое поле. Если букв нет — нажмите <b>«Не вижу букв»</b>.
+Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
+представленной картинке <b>буквы русского алфавита</b>.
+Найденные буквы необходимо ввести в текстовое поле: допускается разделение
+пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>
+На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не&nbsp;вижу&nbsp;букв»</b>.
 </div>""",
                 unsafe_allow_html=True,
             )
