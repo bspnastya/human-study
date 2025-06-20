@@ -10,7 +10,20 @@ st.set_page_config(page_title="Визуализация многоканальн
                    page_icon="🎯", layout="centered", initial_sidebar_state="collapsed")
 
 
-def render_timer_js(seconds: int, key: str):
+def render_timer_js(seconds: int, key: str, auto_click_button: bool = False):
+  
+    auto_click_script = ""
+    if auto_click_button:
+        auto_click_script = f"""
+           
+            const btn = document.querySelector('button[kind="primary"]');
+            if(btn && btn.disabled) {{
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            }}
+        """
+    
     components.html(
         f"""
 <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px">
@@ -22,8 +35,12 @@ def render_timer_js(seconds: int, key: str):
   const span=document.getElementById("t{key}");
   if(window["int_{key}"]) clearInterval(window["int_{key}"]);
   window["int_{key}"]=setInterval(()=>{{
-    left--; if(span) span.textContent=Math.max(0,left);
-    if(left<=0) clearInterval(window["int_{key}"]);
+    left--; 
+    if(span) span.textContent=Math.max(0,left);
+    if(left<=0) {{
+        clearInterval(window["int_{key}"]);
+        {auto_click_script}
+    }}
   }},1000);
 }})();
 </script>
@@ -41,6 +58,7 @@ h1,h2,h3,h4,h5,h6{color:#111!important;}
 header[data-testid="stHeader"],div[data-testid="stHeader"]{display:none;}
 input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;font-size:1.05rem;}
 .stButton>button{min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;background:#222!important;color:#ddd!important;border-radius:8px;}
+.stButton>button:disabled{opacity:0.4!important;cursor:not-allowed!important;}
 #mobile-overlay{position:fixed;inset:0;z-index:9999;background:#808080;display:none;align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;text-align:center;padding:0 20px;}
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
 </style>
@@ -156,10 +174,18 @@ q = qs[i]
 
 
 if st.session_state.phase == "intro":
-    if st.session_state.start_time is None: st.session_state.start_time = time.time()
+    if st.session_state.start_time is None: 
+        st.session_state.start_time = time.time()
+    
     intro_limit = 8 if i < 5 else 3
-    remain = max(intro_limit - (time.time() - st.session_state.start_time), 0)
-    render_timer_js(math.ceil(remain), f"intro{i}")
+    elapsed = time.time() - st.session_state.start_time
+    remain = max(intro_limit - elapsed, 0)
+    
+    
+    time_expired = remain <= 0
+    
+    
+    render_timer_js(math.ceil(remain), f"intro{i}", auto_click_button=True)
 
     if q["qtype"] == "corners":
         st.markdown("""
@@ -177,18 +203,25 @@ if st.session_state.phase == "intro":
 На некоторых картинках букв нет — тогда нажмите кнопку <b>«Не вижу букв»</b>.
 </div>""",unsafe_allow_html=True)
 
-    disabled = remain > 0
-    btn = st.button("Перейти к вопросу", key=f"go{i}", disabled=disabled)
-    if disabled:
-        st_autorefresh(interval=200, key=f"intro_refresh_{i}")
-    if btn and not disabled:
+
+    btn = st.button("Перейти к вопросу", key=f"go{i}", disabled=not time_expired)
+    
+ 
+    if not time_expired:
+       
+        st_autorefresh(interval=100, key=f"intro_refresh_{i}")
+
+    if btn and time_expired:
         st.session_state.phase = "question"
         st.session_state.start_time = None
         st.rerun()
+    
     st.stop()
 
 
-if st.session_state.start_time is None: st.session_state.start_time = time.time()
+if st.session_state.start_time is None: 
+    st.session_state.start_time = time.time()
+
 elapsed = time.time() - st.session_state.start_time
 left = max(TIME_LIMIT - math.floor(elapsed), 0)
 
