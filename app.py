@@ -48,7 +48,7 @@ def render_timer_js(
     </script>
     """,
         height=50,
-        key=f"timer_{timer_key}",
+     
     )
 
 
