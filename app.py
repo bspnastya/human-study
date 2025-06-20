@@ -411,14 +411,14 @@ else:
     with image_container:
         if remaining > 0:
             components.html(f"""
-            <div id="image-container-{current_idx}" style="text-align:left;margin:10px 0;">
-                <img src="{current_question['img']}" width="290" style="border:1px solid #444;border-radius:8px;">
+            <div id="image-container-{current_idx}" style="text-align:left;margin:5px 0;">
+                <img src="{current_question['img']}" width="300" style="border:1px solid #444;border-radius:8px;">
             </div>
             <script>
             setTimeout(function() {{
                 const container = document.getElementById('image-container-{current_idx}');
                 if (container) {{
-                    container.innerHTML = '<div style="font-style:italic;color:#666;padding:40px;">Время показа изображения истекло.</div>';
+                    container.innerHTML = '<div style="font-style:italic;color:#666;padding:20px;">Время показа изображения истекло.</div>';
                 }}
             }}, {TIME_LIMIT * 1000});
             </script>
