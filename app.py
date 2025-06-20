@@ -80,7 +80,7 @@ def letters_set(s: str) -> set[str]:
     return set(s)
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 16
+TIME_LIMIT = 15
 GROUPS = ["img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb",
           "img4_same_corners","img5_same_corners"]
 ALGS = ["pca_rgb_result","socolov_lab_result","socolov_rgb_result","umap_rgb_result"]
