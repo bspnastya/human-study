@@ -124,9 +124,13 @@ if "questions" not in st.session_state:
     st.session_state.pause_until = 0.0
 
 if st.session_state.get("pause_until", 0) > time.time():
-    st.markdown("<div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;color:#fff;background:#262626;border-radius:12px;">
-    Переходим к следующему вопросу....
-</div>")
+    st.markdown(
+        """
+<div style="margin-top:30px;padding:30px;text-align:center;font-size:2rem;color:#fff;background:#262626;border-radius:12px;">
+   Переходим к следующему вопросу...<br>
+</div>""",
+        unsafe_allow_html=True,
+    )
     st_autorefresh(interval=1000, key="pause")
     st.stop()
 
