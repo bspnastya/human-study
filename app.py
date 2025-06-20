@@ -460,7 +460,7 @@ else:
         text_input = st.text_input(
             current_question["prompt"],
             key=f"text_{current_idx}",
-            placeholder="Введите русские буквы"
+            placeholder="Введите русские буквы и нажмите Enter"
         )
         
         col1, col2 = st.columns([1, 3])
