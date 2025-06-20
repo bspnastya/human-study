@@ -10,7 +10,8 @@ st.set_page_config(page_title="Визуализация многоканальн
                    page_icon="🎯", layout="centered",
                    initial_sidebar_state="collapsed")
 
-def render_timer_js(remaining_time: int, timer_key: str):
+def render_timer_js(remaining_time: int, timer_key: str, send_done: bool = False):
+    done_code = "window.parent.postMessage({type:'streamlit:setComponentValue',value:true},'*');" if send_done else ""
     return components.html(f"""
     <div id="timer-{timer_key}"
          style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px">
@@ -24,7 +25,10 @@ def render_timer_js(remaining_time: int, timer_key: str):
       window["int_{timer_key}"] = setInterval(() => {{
         left--;
         if (span) span.textContent = Math.max(0, left);
-        if (left <= 0) clearInterval(window["int_{timer_key}"]);
+        if (left <= 0) {{
+            clearInterval(window["int_{timer_key}"]);
+            {done_code}
+        }}
       }}, 1000);
     }})();
     </script>
@@ -49,7 +53,6 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
     unsafe_allow_html=True,
 )
 
-
 @st.cache_resource(show_spinner="…")
 def get_sheet():
     try:
@@ -73,7 +76,6 @@ def _writer():
         except Exception:
             pass
 threading.Thread(target=_writer, daemon=True).start()
-
 
 def letters_set(s: str) -> set[str]:
     s = re.sub(r"[ ,.;:-]+", "", s.lower())
@@ -114,14 +116,14 @@ def make_questions() -> List[Dict]:
     for n, q in enumerate(seq, 1): q["№"] = n
     return seq
 
-
 if "questions" not in st.session_state:
     st.session_state.questions = make_questions()
     st.session_state.idx = 0
     st.session_state.name = ""
-    st.session_state.phase = "intro"     
+    st.session_state.phase = "intro"
     st.session_state.start_time = None
     st.session_state.pause_until = 0.0
+    st.session_state.intro_shown = False
 
 if st.session_state.get("pause_until", 0) > time.time():
     st.markdown(
@@ -133,7 +135,6 @@ if st.session_state.get("pause_until", 0) > time.time():
     )
     st_autorefresh(interval=1000, key="pause")
     st.stop()
-
 
 if not st.session_state.name:
     st.markdown(
@@ -167,24 +168,18 @@ if not st.session_state.name:
         st.rerun()
     st.stop()
 
-
 def finish(ans: str):
     q = st.session_state.questions[st.session_state.idx]
-    ms = int((time.time() - st.session_state.start_time) * 1000) \
-         if st.session_state.start_time else 0
-    ok = (letters_set(ans) == letters_set(q["correct"])
-          if q["qtype"] == "letters"
-          else ans.lower() == q["correct"].lower())
+    ms = int((time.time() - st.session_state.start_time) * 1000) if st.session_state.start_time else 0
+    ok = (letters_set(ans) == letters_set(q["correct"]) if q["qtype"] == "letters" else ans.lower() == q["correct"].lower())
     if SHEET:
-        log_q.put([datetime.datetime.utcnow().isoformat(),
-                   st.session_state.name, q["№"], q["group"], q["alg"],
-                   q["qtype"], q["prompt"], ans, q["correct"], ms, ok])
+        log_q.put([datetime.datetime.utcnow().isoformat(), st.session_state.name, q["№"], q["group"], q["alg"], q["qtype"], q["prompt"], ans, q["correct"], ms, ok])
     st.session_state.idx += 1
     st.session_state.phase = "intro"
     st.session_state.start_time = None
     st.session_state.pause_until = time.time() + 1
+    st.session_state.intro_shown = False
     st.rerun()
-
 
 qs, total_q = st.session_state.questions, len(st.session_state.questions)
 i = st.session_state.idx
@@ -201,15 +196,14 @@ if i >= total_q:
 
 q = qs[i]
 
-
 if st.session_state.phase == "intro":
     if st.session_state.start_time is None:
         st.session_state.start_time = time.time()
     intro_limit = 8 if i < 5 else 3
-    remain = math.ceil(intro_limit - (time.time() - st.session_state.start_time))
-    if remain > 0:
-        render_timer_js(remain, f"intro{i}")
-        st_autorefresh(interval=1000, key=f"intro_refresh_{i}")
+    remain = intro_limit - (time.time() - st.session_state.start_time)
+    if not st.session_state.intro_shown or remain > 0:
+        done = render_timer_js(math.ceil(remain), f"intro{i}", send_done=True)
+        st.session_state.intro_shown = True
         if q["qtype"] == "corners":
             st.markdown(
                 """
@@ -235,28 +229,32 @@ if st.session_state.phase == "intro":
 </div>""",
                 unsafe_allow_html=True,
             )
+        if done:
+            st.session_state.phase = "question"
+            st.session_state.start_time = None
+            st.rerun()
         st.stop()
-
-    st.session_state.phase = "question"
-    st.session_state.start_time = None               
-    st.rerun()
-
 
 if st.session_state.start_time is None:
     st.session_state.start_time = time.time()
-elapsed = time.time() - st.session_state.start_time
-left = max(TIME_LIMIT - math.floor(elapsed), 0)
 
 st.markdown(f"### Вопрос №{q['№']} из {total_q}")
-render_timer_js(left, f"q{i}")
+render_timer_js(TIME_LIMIT, f"q{i}")
 
-placeholder = st.empty()
-if left > 0:
-    st_autorefresh(interval=1000, key=f"q_refresh_{i}")
-    placeholder.image(q["img"], width=290, clamp=True)
-else:
-    placeholder.markdown("<i>Время показа изображения истекло.</i>",
-                         unsafe_allow_html=True)
+components.html(f"""
+<div style="text-align:center;">
+  <img id="img{i}" src="{q['img']}" width="290" style="display:block;" />
+  <div id="exp{i}" style="font-style:italic;margin-top:6px;"></div>
+</div>
+<script>
+setTimeout(() => {{
+  const im=document.getElementById("img{i}");
+  if(im) im.style.display="none";
+  const ex=document.getElementById("exp{i}");
+  if(ex) ex.textContent="Время показа изображения истекло.";
+}}, {TIME_LIMIT*1000});
+</script>
+""", height=330)
 
 if q["qtype"] == "corners":
     sel = st.radio(q["prompt"],
@@ -265,18 +263,14 @@ if q["qtype"] == "corners":
                     "Затрудняюсь ответить."),
                    index=None, key=f"radio{i}")
     if sel:
-        finish("да" if sel.startswith("Да")
-               else "нет" if sel.startswith("Нет")
-               else "затрудняюсь")
+        finish("да" if sel.startswith("Да") else "нет" if sel.startswith("Нет") else "затрудняюсь")
 else:
-    txt = st.text_input(q["prompt"], key=f"in{i}",
-                        placeholder="Введите русские буквы")
+    txt = st.text_input(q["prompt"], key=f"in{i}", placeholder="Введите русские буквы")
     if txt and not re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
         st.error("Допустимы только русские буквы и знаки пунктуации.")
     if st.button("Не вижу букв", key=f"skip{i}"):
         finish("Не вижу")
     if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
         finish(txt.strip())
-
 
 
