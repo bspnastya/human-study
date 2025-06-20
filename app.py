@@ -70,7 +70,7 @@ def render_timer_with_callback(seconds: int, timer_id: str, callback_on_zero: bo
         """
     
     components.html(f"""
-    <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-10px;">
+    <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-8px;">
         Осталось&nbsp;времени: <span id="timer-{timer_id}">{seconds}</span>&nbsp;сек
     </div>
     <script>
