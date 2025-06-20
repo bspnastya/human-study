@@ -244,7 +244,7 @@ render_timer_js(left, f"q{i}")
 
 placeholder = st.empty()
 if left > 0:
-    st_autorefresh(interval=500, key=f"q_refresh_{i}")
+    st_autorefresh(interval=1000, key=f"q_refresh_{i}")
     placeholder.image(q["img"], width=290, clamp=True)
 else:
     placeholder.markdown("<i>Время показа изображения истекло.</i>",
