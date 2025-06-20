@@ -9,7 +9,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 st.set_page_config(page_title="Визуализация многоканальных изображений", page_icon="🎯", layout="centered", initial_sidebar_state="collapsed")
 
 
-def render_timer_js(remaining_time: int, timer_key: str):
+def render_timer_js(remaining_time: int, timer_key: str, is_intro: bool = False):
     timer_html = f"""
     <div id="timer-{timer_key}" style="font-size: 1.2rem; font-weight: bold; color: #111; margin-bottom: 10px;">
         Осталось времени: <span id="time-{timer_key}">{remaining_time}</span> сек
@@ -19,7 +19,7 @@ def render_timer_js(remaining_time: int, timer_key: str):
         const timerId = 'timer-{timer_key}';
         const timeId = 'time-{timer_key}';
         
-        
+ 
         if (window['interval_' + timerId]) {{
             clearInterval(window['interval_' + timerId]);
         }}
@@ -35,12 +35,13 @@ def render_timer_js(remaining_time: int, timer_key: str):
             
             if (timeLeft <= 0) {{
                 clearInterval(window['interval_' + timerId]);
-           
+    
+                {'window.sessionStorage.setItem("phase_transition", "true");' if is_intro else ''}
                 setTimeout(() => {{ window.location.reload(); }}, 100);
             }}
         }}, 1000);
         
-      
+
         window.addEventListener('beforeunload', function() {{
             if (window['interval_' + timerId]) {{
                 clearInterval(window['interval_' + timerId]);
@@ -127,6 +128,26 @@ if "questions" not in st.session_state:
     st.session_state.phase = "intro"
     st.session_state.start_time = None
 
+
+if st.session_state.phase == "intro":
+
+    check_transition = components.html("""
+    <script>
+    const transition = window.sessionStorage.getItem("phase_transition");
+    if (transition === "true") {
+        window.sessionStorage.removeItem("phase_transition");
+        window.parent.postMessage({type: "streamlit:setComponentValue", value: true}, "*");
+    } else {
+        window.parent.postMessage({type: "streamlit:setComponentValue", value: false}, "*");
+    }
+    </script>
+    """, height=0)
+    
+    if check_transition:
+        st.session_state.phase = "question"
+        st.session_state.start_time = time.time()
+        st.rerun()
+
 qs, total_q = st.session_state.questions, len(st.session_state.questions)
 
 if st.session_state.get("pause_until", 0) > time.time():
@@ -190,8 +211,8 @@ if i < total_q:
         remain = max(intro_limit - int(elapsed), 0)
         
         if remain > 0:
-        
-            render_timer_js(remain, f"intro{i}")
+          
+            render_timer_js(remain, f"intro{i}", is_intro=True)
             
             if q["qtype"] == "corners":
                 st.markdown("""
@@ -227,8 +248,8 @@ if i < total_q:
     
     st.markdown(f"### Вопрос №{q['№']} из {total_q}")
     
-
-    render_timer_js(left, f"q{i}")
+   
+    render_timer_js(left, f"q{i}", is_intro=False)
     
     if left > 0:
         st.image(q["img"], width=290, clamp=True)
@@ -253,4 +274,3 @@ else:
     Вы завершили прохождение.<br><b>Спасибо за участие!</b>
 </div>""", unsafe_allow_html=True)
     st.balloons()
-
