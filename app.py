@@ -411,7 +411,7 @@ else:
     with image_container:
         if remaining > 0:
             components.html(f"""
-            <div id="image-container-{current_idx}" style="text-align:center;margin:20px 0;">
+            <div id="image-container-{current_idx}" style="text-align:left;margin:20px 0;">
                 <img src="{current_question['img']}" width="290" style="border:1px solid #444;border-radius:8px;">
             </div>
             <script>
@@ -425,7 +425,7 @@ else:
             """, height=350)
         else:
             st.markdown(
-                "<div style='text-align:center;font-style:italic;color:#666;padding:40px;'>"
+                "<div style='text-align:left;font-style:italic;color:#666;padding:40px 0;'>"
                 "Время показа изображения истекло."
                 "</div>", 
                 unsafe_allow_html=True
