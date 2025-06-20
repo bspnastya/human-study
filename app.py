@@ -1,6 +1,6 @@
 from __future__ import annotations
 from streamlit_autorefresh import st_autorefresh
-import random, time, datetime, secrets, threading, queue, re, itertools
+import random, time, datetime, secrets, threading, queue, re, itertools, math   
 from typing import List, Dict
 import streamlit as st, streamlit.components.v1 as components
 import gspread
@@ -160,10 +160,10 @@ if st.session_state.phase == "intro":
     if st.session_state.start_time is None:
         st.session_state.start_time = time.time()
     intro_limit = 8 if i < 5 else 3
-    remain = intro_limit - int(time.time() - st.session_state.start_time)
+    remain = math.ceil(intro_limit - (time.time() - st.session_state.start_time))   
     if remain > 0:
         render_timer_js(remain, f"intro{i}")
-        st_autorefresh(interval=1000, key=f"intro_refresh_{i}")
+        st_autorefresh(interval=500, key=f"intro_refresh_{i}")                     
         if q["qtype"] == "corners":
             st.markdown("""
 <div style="font-size:1.1rem;">
@@ -191,14 +191,17 @@ if st.session_state.phase == "intro":
 if st.session_state.start_time is None:
     st.session_state.start_time = time.time()
 elapsed = time.time() - st.session_state.start_time
-left = max(TIME_LIMIT - int(elapsed), 0)
+left = max(math.ceil(TIME_LIMIT - elapsed), 0)                                   
 st.markdown(f"### Вопрос №{q['№']} из {total_q}")
-render_timer_js(left, f"q{i}")
+render_timer_js(TIME_LIMIT, f"q{i}")                                              
+
+placeholder = st.empty()                                                     
 if left > 0:
     st_autorefresh(interval=1000, key=f"q_refresh_{i}")
-    st.image(q["img"], width=290, clamp=True)
+    placeholder.image(q["img"], width=290, clamp=True)
 else:
-    st.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
+    placeholder.markdown("<i>Время показа изображения истекло.</i>", unsafe_allow_html=True)
+
 if q["qtype"] == "corners":
     sel = st.radio(q["prompt"], ("Да, углы одного цвета.", "Нет, углы окрашены в разные цвета.", "Затрудняюсь ответить."), index=None, key=f"radio{i}")
     if sel: 
@@ -211,7 +214,6 @@ else:
         finish("Не вижу")
     if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt): 
         finish(txt.strip())
-
 
 
 
