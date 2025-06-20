@@ -411,7 +411,7 @@ else:
     with image_container:
         if remaining > 0:
             components.html(f"""
-            <div id="image-container-{current_idx}" style="text-align:left;margin:20px 0;">
+            <div id="image-container-{current_idx}" style="text-align:left;margin:10px 0;">
                 <img src="{current_question['img']}" width="290" style="border:1px solid #444;border-radius:8px;">
             </div>
             <script>
