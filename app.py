@@ -19,7 +19,7 @@ BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15  
 INTRO_TIME_FIRST = 8 
 INTRO_TIME_REST = 3   
-REFRESH_INTERVAL = 100  
+REFRESH_INTERVAL = 500  
 
 
 st.markdown("""
@@ -50,6 +50,29 @@ input[data-testid="stTextInput"]{
     text-align:center;padding:0 20px;
 }
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
+
+
+* {
+    -webkit-backface-visibility: hidden;
+    -webkit-transform: translateZ(0) scale(1.0, 1.0);
+    transform: translateZ(0);
+}
+.stApp > div {
+    transition: opacity 0.1s ease-in-out;
+}
+
+.element-container {
+    will-change: transform;
+}
+
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.main > div {
+    min-height: 100vh;
+}
 </style>
 <div id="mobile-overlay">
     Уважаемый&nbsp;участник,<br>
@@ -58,17 +81,8 @@ input[data-testid="stTextInput"]{
 """, unsafe_allow_html=True)
 
 
-def render_timer_with_callback(seconds: int, timer_id: str, callback_on_zero: bool = False):
-   
-    callback_script = ""
-    if callback_on_zero:
-        callback_script = """
-      
-            window.sessionStorage.setItem('timer_expired_""" + timer_id + """', 'true');
-         
-            window.location.href = window.location.href;
-        """
-    
+def render_timer(seconds: int, timer_id: str):
+    """Рендерит таймер с обратным отсчетом без callback"""
     components.html(f"""
     <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-8px;">
         Осталось&nbsp;времени: <span id="timer-{timer_id}">{seconds}</span>&nbsp;сек
@@ -79,12 +93,10 @@ def render_timer_with_callback(seconds: int, timer_id: str, callback_on_zero: bo
         const spanElement = document.getElementById(timerId);
         let timeLeft = {seconds};
         
-
         if (window['interval_' + timerId]) {{
             clearInterval(window['interval_' + timerId]);
         }}
         
-      
         window['interval_' + timerId] = setInterval(function() {{
             timeLeft--;
             if (spanElement) {{
@@ -93,11 +105,9 @@ def render_timer_with_callback(seconds: int, timer_id: str, callback_on_zero: bo
             
             if (timeLeft <= 0) {{
                 clearInterval(window['interval_' + timerId]);
-                {callback_script}
             }}
         }}, 1000);
         
-     
         window.addEventListener('beforeunload', function() {{
             if (window['interval_' + timerId]) {{
                 clearInterval(window['interval_' + timerId]);
@@ -108,23 +118,6 @@ def render_timer_with_callback(seconds: int, timer_id: str, callback_on_zero: bo
     """, height=50)
 
 
-def check_timer_expired(timer_id: str) -> bool:
-    
-    result = components.html(f"""
-    <script>
-    const expired = window.sessionStorage.getItem('timer_expired_{timer_id}');
-    if (expired === 'true') {{
-        window.sessionStorage.removeItem('timer_expired_{timer_id}');
-       
-        window.parent.postMessage({{type: 'streamlit:setComponentValue', value: true}}, '*');
-    }} else {{
-        window.parent.postMessage({{type: 'streamlit:setComponentValue', value: false}}, '*');
-    }}
-    </script>
-    """, height=0)
-    return result == True
-
-
 @st.cache_resource(show_spinner="Подключение...")
 def get_sheet():
     try:
@@ -133,7 +126,6 @@ def get_sheet():
         return gc.open("human_study_results").sheet1
     except Exception:
         return None
-
 
 
 SHEET = get_sheet()
@@ -197,11 +189,9 @@ def make_questions() -> List[Dict]:
             }
         ])
     
-
     for questions in per_group.values():
         random.shuffle(questions)
     
- 
     sequence = []
     prev_group = None
     
@@ -214,7 +204,6 @@ def make_questions() -> List[Dict]:
         sequence.append(per_group[chosen_group].pop())
         prev_group = chosen_group
     
-
     for n, q in enumerate(sequence, 1):
         q["№"] = n
     
@@ -231,7 +220,6 @@ if "initialized" not in st.session_state:
     st.session_state.pause_until = 0
 
 
-
 if st.session_state.pause_until > time.time():
     st.markdown(
         "<div style='text-align:center;font-size:1.5rem;color:#fff;background:#262626;padding:20px;border-radius:12px;margin-top:50px;'>"
@@ -241,7 +229,6 @@ if st.session_state.pause_until > time.time():
     )
     st_autorefresh(interval=200, key="pause_refresh")
     st.stop()
-
 
 
 if not st.session_state.name:
@@ -275,21 +262,17 @@ if not st.session_state.name:
 
 
 def finish_answer(answer: str):
-   
     current_q = st.session_state.questions[st.session_state.idx]
     
-   
     time_ms = 0
     if st.session_state.phase_start_time:
         time_ms = int((time.time() - st.session_state.phase_start_time) * 1000)
     
-
     if current_q["qtype"] == "letters":
         is_correct = letters_set(answer) == letters_set(current_q["correct"])
     else:
         is_correct = answer.lower() == current_q["correct"].lower()
     
-   
     log_queue.put([
         datetime.datetime.utcnow().isoformat(),
         st.session_state.name,
@@ -304,7 +287,6 @@ def finish_answer(answer: str):
         is_correct
     ])
     
-   
     st.session_state.idx += 1
     st.session_state.phase = "intro"
     st.session_state.phase_start_time = None
@@ -312,11 +294,9 @@ def finish_answer(answer: str):
     st.rerun()
 
 
-
 questions = st.session_state.questions
 total_questions = len(questions)
 current_idx = st.session_state.idx
-
 
 if current_idx >= total_questions:
     st.markdown("""
@@ -330,26 +310,22 @@ if current_idx >= total_questions:
 current_question = questions[current_idx]
 
 
-
 if st.session_state.phase == "intro":
-
     if st.session_state.phase_start_time is None:
         st.session_state.phase_start_time = time.time()
-    
     
     intro_duration = INTRO_TIME_FIRST if current_idx < 5 else INTRO_TIME_REST
     elapsed = time.time() - st.session_state.phase_start_time
     remaining = max(0, intro_duration - elapsed)
     
     if remaining > 0:
-        
-        render_timer_with_callback(
+     
+        render_timer(
             seconds=math.ceil(remaining),
-            timer_id=f"intro_{current_idx}",
-            callback_on_zero=True
+            timer_id=f"intro_{current_idx}"
         )
         
- 
+
         if current_question["qtype"] == "corners":
             st.markdown("""
             <div style="font-size:1.1rem;line-height:1.6;">
@@ -372,12 +348,6 @@ if st.session_state.phase == "intro":
             </div>
             """, unsafe_allow_html=True)
         
-        
-        if check_timer_expired(f"intro_{current_idx}"):
-            st.session_state.phase = "question"
-            st.session_state.phase_start_time = None
-            st.rerun()
-        
   
         st_autorefresh(interval=REFRESH_INTERVAL, key=f"intro_refresh_{current_idx}")
     else:
@@ -387,25 +357,19 @@ if st.session_state.phase == "intro":
         st.rerun()
 
 
-
-else: 
-  
+else:
     if st.session_state.phase_start_time is None:
         st.session_state.phase_start_time = time.time()
     
     elapsed = time.time() - st.session_state.phase_start_time
     remaining = max(0, TIME_LIMIT - elapsed)
     
-
     st.markdown(f"### Вопрос №{current_question['№']} из {total_questions}")
     
- 
-    render_timer_with_callback(
+    render_timer(
         seconds=math.ceil(remaining),
-        timer_id=f"question_{current_idx}",
-        callback_on_zero=False
+        timer_id=f"question_{current_idx}"
     )
-    
     
     image_container = st.container()
     with image_container:
@@ -418,7 +382,7 @@ else:
             setTimeout(function() {{
                 const container = document.getElementById('image-container-{current_idx}');
                 if (container) {{
-                    container.innerHTML = '<div style="font-style:italic;color:#666;padding:20px;">Время показа изображения истекло.</div>';
+                    container.innerHTML = '<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';
                 }}
             }}, {TIME_LIMIT * 1000});
             </script>
@@ -431,11 +395,9 @@ else:
                 unsafe_allow_html=True
             )
     
-    # Форма ответа
     st.markdown("---")
     
     if current_question["qtype"] == "corners":
-        # Вопрос про углы
         selection = st.radio(
             current_question["prompt"],
             options=[
@@ -456,7 +418,6 @@ else:
                 finish_answer("затрудняюсь")
     
     else:
-        # Вопрос про буквы
         text_input = st.text_input(
             current_question["prompt"],
             key=f"text_{current_idx}",
@@ -474,7 +435,6 @@ else:
             else:
                 st.error("Допустимы только русские буквы и знаки пунктуации.")
     
-    # Автообновление для обновления таймера
     if remaining > 0:
         st_autorefresh(interval=1000, key=f"question_refresh_{current_idx}")
 
