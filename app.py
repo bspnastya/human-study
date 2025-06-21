@@ -321,7 +321,7 @@ if st.session_state.phase == "intro":
    if current_idx < 5:
        if current_question["qtype"] == "corners":
            st.markdown("""
-           <div style="font-size:1.1rem;line-height:1.6;">
+           <div style="font-size:1.1rem;line-height:1.6;margin-bottom:30px;">
                Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на
                диаметрально противоположные углы, <b>правый верхний и левый нижний</b>,
                и определить, окрашены ли они в один цвет.<br><br>
@@ -330,7 +330,7 @@ if st.session_state.phase == "intro":
            """, unsafe_allow_html=True)
        else:
            st.markdown("""
-           <div style="font-size:1.1rem;line-height:1.6;">
+           <div style="font-size:1.1rem;line-height:1.6;margin-bottom:30px;">
                Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на
                представленной картинке <b>буквы русского алфавита</b>.<br><br>
                Найденные буквы необходимо ввести в текстовое поле: допускается разделение
@@ -463,8 +463,6 @@ else:
    
    if remaining > 0:
        st_autorefresh(interval=1000, key=f"question_refresh_{current_idx}")
-
-
 
 
 
