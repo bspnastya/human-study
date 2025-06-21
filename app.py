@@ -7,14 +7,6 @@ import streamlit.components.v1 as components
 import gspread 
 from oauth2client.service_account import ServiceAccountCredentials
 
-
-st.set_page_config(
-    page_title="Визуализация многоканальных изображений",
-    page_icon="🎯", 
-    layout="centered", 
-    initial_sidebar_state="collapsed"
-)
-
 mobile_check = st.container()
 with mobile_check:
     components.html("""
@@ -56,11 +48,16 @@ with mobile_check:
     }
     </script>
     """, height=0)
-
-
+   
 if st.session_state.get('is_mobile', False):
     st.stop()
-
+    
+st.set_page_config(
+    page_title="Визуализация многоканальных изображений",
+    page_icon="🎯", 
+    layout="centered", 
+    initial_sidebar_state="collapsed"
+)
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15  
