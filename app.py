@@ -220,7 +220,7 @@ if "initialized" not in st.session_state:
     st.session_state.pause_until = 0
 
 
-if st.session_state.pause_until > time.time():
+if (st.session_state.pause_until > time.time() and st.session_state.idx < len(st.session_state.questions)):
     st.markdown(
         "<div style='text-align:center;font-size:1.5rem;color:#fff;background:#262626;padding:20px;border-radius:12px;margin-top:50px;'>"
         "Переходим к следующему вопросу..."
