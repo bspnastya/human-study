@@ -7,13 +7,44 @@ import streamlit.components.v1 as components
 import gspread 
 from oauth2client.service_account import ServiceAccountCredentials
 
-    
+MOBILE_QS_FLAG = "mobile"   
 st.set_page_config(
     page_title="Визуализация многоканальных изображений",
     page_icon="🎯", 
     layout="centered", 
     initial_sidebar_state="collapsed"
 )
+
+components.html(
+    f"""
+    <script>
+    (function() {{
+        const flag = '{MOBILE_QS_FLAG}';
+        const params = new URLSearchParams(window.location.search);
+        const isMobile = window.innerWidth < 1024;
+        if (isMobile && !params.has(flag)) {{
+            params.set(flag, '1');
+            window.location.search = params.toString();
+        }}
+    }})();
+    </script>
+    """,
+    height=0,
+)
+
+query_params = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
+if query_params.get(MOBILE_QS_FLAG) == ["1"]:
+    st.markdown(
+        """
+        <style>
+            body{background:#808080;color:#fff;text-align:center;display:flex;align-items:center;justify-content:center;height:100vh;}
+            h2{margin:0 auto;}
+        </style>
+        <h2>Уважаемый участник<br>Данное исследование доступно только с <strong>ПК или ноутбука</strong>.</h2>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.stop()
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15  
@@ -45,7 +76,7 @@ input[data-testid="stTextInput"]{
 #mobile-overlay{
     position:fixed;
     inset:0;
-    z-index:9999;
+    z-index:2147483647;
     background:#808080;
     display:none;
     align-items:center;
@@ -54,6 +85,7 @@ input[data-testid="stTextInput"]{
     font:500 1.2rem/1.5 sans-serif;
     text-align:center;
     padding:0 20px;
+    pointer-events:all;
 }
 @media (max-width:1023px){
     #mobile-overlay{
