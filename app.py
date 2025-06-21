@@ -8,13 +8,13 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 MOBILE_QS_FLAG = "mobile"   
+
 st.set_page_config(
     page_title="Визуализация многоканальных изображений",
     page_icon="🎯", 
     layout="centered", 
     initial_sidebar_state="collapsed"
 )
-
 
 
 components.html(
@@ -31,7 +31,6 @@ components.html(
     """,
     height=0,
 )
-
 
 q = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
 if q.get(MOBILE_QS_FLAG) == ["1"]:
@@ -57,47 +56,30 @@ REFRESH_INTERVAL = 500
 st.markdown(
     """
     <style>
-    
     html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
         background:#808080!important;color:#111!important;
     }
-    body{
-        -webkit-font-smoothing:antialiased;
-        -moz-osx-font-smoothing:grayscale;
-    }
+    body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
     h1,h2,h3,h4,h5,h6{color:#111!important;}
     header[data-testid="stHeader"]{display:none;}
-    .stButton>button{
-        min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;background:#222!important;color:#ddd!important;border-radius:8px;
-    }
-    input[data-testid="stTextInput"]{
-        height:52px!important;padding:0 16px!important;font-size:1.05rem;
-    }
+    .stButton>button{min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;background:#222!important;color:#ddd!important;border-radius:8px;}
+    input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;font-size:1.05rem;}
 
- 
-    #mobile-overlay{
-        position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;text-align:center;padding:0 20px;background:#808080;
-    }
+   
+    #mobile-overlay{position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;text-align:center;padding:0 20px;background:#808080;}
 
-  
     @media (max-width:1023px){
         #mobile-overlay{display:flex;}
-        .block-container *{opacity:0!important;pointer-events:none!important;user-select:none!important;}
-        #mobile-overlay, #mobile-overlay *{opacity:1!important;pointer-events:auto!important;user-select:auto!important;}
+        .block-container > *:not(#mobile-overlay):not(style){display:none!important;}
         html,body{overflow:hidden!important;height:100%!important;}
     }
 
- 
-    .stApp > div{
-        -webkit-backface-visibility:hidden;backface-visibility:hidden;
-        transition:opacity .1s ease-in-out;
-    }
+    .stApp > div{-webkit-backface-visibility:hidden;backface-visibility:hidden;transition:opacity .1s ease-in-out;}
     </style>
     <div id="mobile-overlay">Уважаемый&nbsp;участник,<br>данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.</div>
     """,
     unsafe_allow_html=True,
 )
-
 
 def render_timer(seconds: int, timer_id: str):
   
