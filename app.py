@@ -45,11 +45,8 @@ input[data-testid="stTextInput"]{
 }
 #mobile-overlay{
     position:fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    z-index:2147483647;
+    inset:0;
+    z-index:9999;
     background:#808080;
     display:none;
     align-items:center;
@@ -61,16 +58,14 @@ input[data-testid="stTextInput"]{
 }
 @media (max-width:1023px){
     #mobile-overlay{
-        display:flex!important;
+        display:flex;
     }
 }
 
-{
+.stApp > div {
     -webkit-backface-visibility: hidden;
     -webkit-transform: translateZ(0) scale(1.0, 1.0);
     transform: translateZ(0);
-}
-.stApp > div {
     transition: opacity 0.1s ease-in-out;
 }
 .element-container {
@@ -88,17 +83,7 @@ body {
     Уважаемый&nbsp;участник,<br>
     данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>
-<script>
-
-(function() {
-    var overlay = document.getElementById('mobile-overlay');
-    if (overlay && document.body) {
-        document.body.appendChild(overlay);
-    }
-})();
-</script>
 """, unsafe_allow_html=True)
-
 
 
 def render_timer(seconds: int, timer_id: str):
