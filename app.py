@@ -15,6 +15,52 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+mobile_check = st.container()
+with mobile_check:
+    components.html("""
+    <script>
+    if (window.innerWidth <= 1023) {
+      
+        window.parent.postMessage({type: 'streamlit:setComponentValue', value: true}, '*');
+        
+    
+        document.documentElement.innerHTML = `
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body {
+                        margin: 0;
+                        padding: 20px;
+                        background: #808080;
+                        color: #fff;
+                        font-family: sans-serif;
+                        text-align: center;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 100vh;
+                        font-size: 1.2rem;
+                        line-height: 1.5;
+                    }
+                </style>
+            </head>
+            <body>
+                <div>
+                    Уважаемый&nbsp;участник,<br>
+                    данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
+                </div>
+            </body>
+            </html>
+        `;
+    }
+    </script>
+    """, height=0)
+
+
+if st.session_state.get('is_mobile', False):
+    st.stop()
+
 
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT = 15  
