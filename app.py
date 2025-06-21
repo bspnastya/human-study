@@ -4,7 +4,7 @@ import random, time, datetime, secrets, threading, queue, re, itertools, math
 from typing import List, Dict
 import streamlit as st
 import streamlit.components.v1 as components
-import gspread
+import gspread 
 from oauth2client.service_account import ServiceAccountCredentials
 
 st.set_page_config(
@@ -79,6 +79,7 @@ body {
     данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>
 """, unsafe_allow_html=True)
+
 
 
 def render_timer(seconds: int, timer_id: str):
