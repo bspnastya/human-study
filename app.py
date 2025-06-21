@@ -88,11 +88,26 @@ body {
     данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>
 <script>
-
 (function() {
-    var overlay = document.getElementById('mobile-overlay');
-    if (overlay && document.body) {
-        document.body.appendChild(overlay);
+    if (window.innerWidth <= 1023) {
+
+        setTimeout(function() {
+            var stApp = document.querySelector('.stApp');
+            if (stApp) {
+                var children = stApp.children;
+                for (var i = 0; i < children.length; i++) {
+                    if (children[i].id !== 'mobile-overlay') {
+                        children[i].style.display = 'none';
+                    }
+                }
+            }
+            
+            var overlay = document.getElementById('mobile-overlay');
+            if (overlay) {
+                document.body.appendChild(overlay);
+                overlay.style.display = 'flex';
+            }
+        }, 100);
     }
 })();
 </script>
