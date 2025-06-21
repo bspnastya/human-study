@@ -6,6 +6,35 @@ import streamlit as st
 import streamlit.components.v1 as components
 import gspread 
 from oauth2client.service_account import ServiceAccountCredentials
+components.html("""
+<script>
+if (window.innerWidth <= 1023) {
+    document.body.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #808080;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font: 500 1.2rem/1.5 sans-serif;
+            text-align: center;
+            padding: 0 20px;
+            z-index: 2147483647;
+        ">
+            Уважаемый&nbsp;участник,<br>
+            данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
+        </div>
+    `;
+
+    window.stop();
+}
+</script>
+""", height=0)
 
 st.set_page_config(
     page_title="Визуализация многоканальных изображений",
