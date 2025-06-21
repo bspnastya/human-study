@@ -52,7 +52,7 @@ input[data-testid="stTextInput"]{
 @media (max-width:1023px){#mobile-overlay{display:flex;}}
 
 
-*{
+ {
     -webkit-backface-visibility: hidden;
     -webkit-transform: translateZ(0) scale(1.0, 1.0);
     transform: translateZ(0);
@@ -82,7 +82,7 @@ body {
 
 
 def render_timer(seconds: int, timer_id: str):
-    
+  
     components.html(f"""
     <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-8px;">
         Осталось&nbsp;времени: <span id="timer-{timer_id}">{seconds}</span>&nbsp;сек
@@ -437,5 +437,6 @@ else:
     
     if remaining > 0:
         st_autorefresh(interval=1000, key=f"question_refresh_{current_idx}")
+
 
 
