@@ -88,26 +88,11 @@ body {
     данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
 </div>
 <script>
-(function() {
-    if (window.innerWidth <= 1023) {
 
-        setTimeout(function() {
-            var stApp = document.querySelector('.stApp');
-            if (stApp) {
-                var children = stApp.children;
-                for (var i = 0; i < children.length; i++) {
-                    if (children[i].id !== 'mobile-overlay') {
-                        children[i].style.display = 'none';
-                    }
-                }
-            }
-            
-            var overlay = document.getElementById('mobile-overlay');
-            if (overlay) {
-                document.body.appendChild(overlay);
-                overlay.style.display = 'flex';
-            }
-        }, 100);
+(function() {
+    var overlay = document.getElementById('mobile-overlay');
+    if (overlay && document.body) {
+        document.body.appendChild(overlay);
     }
 })();
 </script>
@@ -471,6 +456,9 @@ else:
     
     if remaining > 0:
         st_autorefresh(interval=1000, key=f"question_refresh_{current_idx}")
+
+
+
 
 
 
