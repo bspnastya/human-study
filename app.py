@@ -252,7 +252,7 @@ if not st.session_state.name:
    </div>
    """, unsafe_allow_html=True)
    
-   name_input = st.text_input("", placeholder="Фамилия / псевдоним", key="username", label_visibility="collapsed")
+   name_input = st.text_input("", placeholder="Ваш псевдоним", key="username", label_visibility="collapsed")
    
    if st.button("🎲 Сгенерировать псевдоним"):
        st.session_state.name = f"Участник_{secrets.randbelow(900000) + 100000}"
