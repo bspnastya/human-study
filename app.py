@@ -15,30 +15,31 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+
+
 components.html(
     f"""
     <script>
     (function() {{
         const flag = '{MOBILE_QS_FLAG}';
-        const params = new URLSearchParams(window.location.search);
         const isMobile = window.innerWidth < 1024;
-        if (isMobile && !params.has(flag)) {{
-            params.set(flag, '1');
-            window.location.search = params.toString();
-        }}
+        if (isMobile) document.documentElement.classList.add('mobile-client');
+        const qs = new URLSearchParams(window.location.search);
+        if (isMobile && !qs.has(flag)) {{ qs.set(flag,'1'); window.location.search = qs.toString(); }}
     }})();
     </script>
     """,
     height=0,
 )
 
-query_params = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
-if query_params.get(MOBILE_QS_FLAG) == ["1"]:
+
+q = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
+if q.get(MOBILE_QS_FLAG) == ["1"]:
     st.markdown(
         """
         <style>
-            body{background:#808080;color:#fff;text-align:center;display:flex;align-items:center;justify-content:center;height:100vh;}
-            h2{margin:0 auto;}
+          body{background:#808080;color:#fff;text-align:center;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}
+          h2{margin:0 auto;line-height:1.4;font-size:1.3rem;font-weight:500;}
         </style>
         <h2>Уважаемый участник<br>Данное исследование доступно только с <strong>ПК или ноутбука</strong>.</h2>
         """,
@@ -46,75 +47,56 @@ if query_params.get(MOBILE_QS_FLAG) == ["1"]:
     )
     st.stop()
 
+
 BASE_URL = "https://storage.yandexcloud.net/test3123234442"
-TIME_LIMIT = 15  
-INTRO_TIME_FIRST = 8 
-INTRO_TIME_REST = 3   
-REFRESH_INTERVAL = 500  
+TIME_LIMIT = 15
+INTRO_TIME_FIRST = 8
+INTRO_TIME_REST = 3
+REFRESH_INTERVAL = 500
 
-
-st.markdown("""
-<style>
-html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
-    background:#808080!important;color:#111!important;
-}
-h1,h2,h3,h4,h5,h6{color:#111!important;}
-header[data-testid="stHeader"]{display:none;}
-.stButton>button{
-    min-height:52px!important;
-    padding:0 20px!important;
-    border:1px solid #555!important;
-    background:#222!important;
-    color:#ddd!important;
-    border-radius:8px;
-}
-input[data-testid="stTextInput"]{
-    height:52px!important;
-    padding:0 16px!important;
-    font-size:1.05rem;
-}
-#mobile-overlay{
-    position:fixed;
-    inset:0;
-    z-index:2147483647;
-    background:#808080;
-    display:none;
-    align-items:center;
-    justify-content:center;
-    color:#fff;
-    font:500 1.2rem/1.5 sans-serif;
-    text-align:center;
-    padding:0 20px;
-    pointer-events:all;
-}
-@media (max-width:1023px){
-    #mobile-overlay{
-        display:flex;
+st.markdown(
+    """
+    <style>
+    
+    html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
+        background:#808080!important;color:#111!important;
     }
-}
+    body{
+        -webkit-font-smoothing:antialiased;
+        -moz-osx-font-smoothing:grayscale;
+    }
+    h1,h2,h3,h4,h5,h6{color:#111!important;}
+    header[data-testid="stHeader"]{display:none;}
+    .stButton>button{
+        min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;background:#222!important;color:#ddd!important;border-radius:8px;
+    }
+    input[data-testid="stTextInput"]{
+        height:52px!important;padding:0 16px!important;font-size:1.05rem;
+    }
 
-.stApp > div {
-    -webkit-backface-visibility: hidden;
-    -webkit-transform: translateZ(0) scale(1.0, 1.0);
-    transform: translateZ(0);
-    transition: opacity 0.1s ease-in-out;
-}
-.element-container {
-    will-change: transform;
-}
-body {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-.main > div {
-    min-height: 100vh;
-}
-</style>
-<div id="mobile-overlay">
-    Уважаемый&nbsp;участник,<br>
-    данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.
-</div>
-""", unsafe_allow_html=True)
+ 
+    #mobile-overlay{
+        position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;text-align:center;padding:0 20px;background:#808080;
+    }
+
+  
+    @media (max-width:1023px){
+        #mobile-overlay{display:flex;}
+        .block-container *{opacity:0!important;pointer-events:none!important;user-select:none!important;}
+        #mobile-overlay, #mobile-overlay *{opacity:1!important;pointer-events:auto!important;user-select:auto!important;}
+        html,body{overflow:hidden!important;height:100%!important;}
+    }
+
+ 
+    .stApp > div{
+        -webkit-backface-visibility:hidden;backface-visibility:hidden;
+        transition:opacity .1s ease-in-out;
+    }
+    </style>
+    <div id="mobile-overlay">Уважаемый&nbsp;участник,<br>данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.</div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 def render_timer(seconds: int, timer_id: str):
