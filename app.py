@@ -62,16 +62,8 @@ input[data-testid="stTextInput"]{
     #mobile-overlay{
         display:flex!important;
     }
-   
-    .stApp > header,
-    .stApp > div:not(style),
-    .main,
-    .block-container,
-    section[data-testid="stSidebar"],
-    div[data-testid="stDecoration"],
-    iframe {
-        display:none!important;
-        visibility:hidden!important;
+    body {
+        overflow:hidden!important;
     }
 }
 * {
