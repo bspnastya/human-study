@@ -70,7 +70,7 @@ st.markdown(
 
     @media (max-width:1023px){
         #mobile-overlay{display:flex;}
-        .block-container > *:not(#mobile-overlay):not(style){display:none!important;}
+        .block-container > .element-container:nth-child(n+2){display:none!important;}
         html,body{overflow:hidden!important;height:100%!important;}
     }
 
