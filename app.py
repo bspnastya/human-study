@@ -67,7 +67,7 @@ st.markdown("<style>html,body,.stApp,[data-testid=\"stAppViewContainer\"],.main,
 
 components.html("<script>window.startTimer=(id,sec)=>{clearInterval(window['i_'+id]);let t=sec,s=document.getElementById(id);window['i_'+id]=setInterval(()=>{if(s)s.textContent=Math.max(0,--t);if(t<=0)clearInterval(window['i_'+id]);},1000);}</script>", height=0)
 def render_timer(key: str, sec: int):
-    components.html(f"<div style='font-size:1.2rem;font-weight:bold;margin-bottom:10px;margin-left:-8px;'>Осталось&nbsp;времени: <span id=\"{key}\">{sec}</span>&nbsp;сек</div><script>startTimer('{key}',{sec})</script>", height=0)
+    components.html(f"<div style='font-size:1.2rem;font-weight:bold;margin-bottom:10px;'>Осталось&nbsp;времени: <span id=\"{key}\">{sec}</span>&nbsp;сек</div><script>startTimer('{key}',{sec})</script>", height=0)
 
 @st.cache_resource
 def sheet():
@@ -82,16 +82,12 @@ def writer():
     while True:
         row = log_q.get()
         if row != "__FLUSH__":
-            batch.append(row)
-            cells += len(row)
+            batch.append(row); cells += len(row)
         if row == "__FLUSH__" or cells >= BATCH_LIMIT_CELLS:
             if batch:
-                try:
-                    SHEET.append_rows(batch, value_input_option="RAW")
-                except:
-                    pass
-                batch.clear()
-                cells = 0
+                try: SHEET.append_rows(batch, value_input_option="RAW")
+                except: pass
+                batch.clear(); cells = 0
         log_q.task_done()
 threading.Thread(target=writer, daemon=True).start()
 atexit.register(lambda: log_q.put("__FLUSH__"))
@@ -129,70 +125,50 @@ def esc(s: str) -> str:
 
 ss = st.session_state
 if "seq" not in ss:
-    ss.seq = build_questions()
-    ss.idx = 0
-    ss.phase = "intro"
-    ss.name = ""
-    ss.sid = str(uuid.uuid4())
+    ss.seq = build_questions(); ss.idx = 0; ss.phase = "intro"; ss.name = ""; ss.sid = str(uuid.uuid4())
 
 if not ss.name:
     st.markdown(WELCOME_HTML, unsafe_allow_html=True)
     nick = st.text_input("", placeholder="Ваш псевдоним", label_visibility="collapsed")
     if st.button("🎲 Сгенерировать псевдоним"):
-        ss.name = f"Участник_{secrets.randbelow(900000)+100000}"
-        st.rerun()
+        ss.name = f"Участник_{secrets.randbelow(900000)+100000}"; st.rerun()
     if nick:
-        ss.name = esc(nick.strip())
-        st.rerun()
+        ss.name = esc(nick.strip()); st.rerun()
     st.stop()
 
 if ss.idx >= len(ss.seq):
     log_q.put("__FLUSH__")
     st.markdown("<div style='margin-top:40px;padding:40px;text-align:center;font-size:2rem;background:#262626;color:#fff;border-radius:12px;'>Вы завершили прохождение.<br><b>Спасибо за участие!</b></div>", unsafe_allow_html=True)
-    st.balloons()
-    st.stop()
+    st.balloons(); st.stop()
 
 q = ss.seq[ss.idx]
 def save(ans: str):
     t_ms = int((time.time() - ss.t0) * 1000)
     ok = letters_set(ans) == letters_set(q["correct"]) if q["qtype"] == "letters" else ans.lower() == q["correct"].lower()
     log_q.put_nowait([datetime.datetime.utcnow().isoformat(), ss.sid, ss.name, q["№"], q["group"], q["alg"], q["qtype"], esc(q["prompt"]), esc(ans), esc(q["correct"]), t_ms, ok])
-    ss.idx += 1
-    ss.phase = "intro"
-    time.sleep(PAUSE_SEC)
-    st.experimental_rerun()
+    ss.idx += 1; ss.phase = "intro"; time.sleep(PAUSE_SEC); st.experimental_rerun()
 
 if ss.phase == "intro":
     if ss.idx < INTRO_FIRST:
         st.markdown(INTRO_CORNERS_TEXT if q["qtype"] == "corners" else INTRO_LETTERS_TEXT, unsafe_allow_html=True)
         fetch_png(q["img"])
         if st.button("Перейти к вопросу"):
-            ss.phase = "question"
-            ss.t0 = time.time()
-            st.experimental_rerun()
+            ss.phase = "question"; ss.t0 = time.time(); st.experimental_rerun()
         st.stop()
-
-    if "intro_t0" not in ss:
-        ss.intro_t0 = time.time()
-    remaining = INTRO_REST_SEC - (time.time() - ss.intro_t0)
-    if remaining <= 0:
-        ss.pop("intro_t0")
-        ss.phase = "question"
-        ss.t0 = time.time()
-        st.experimental_rerun()
-
-    render_timer(f"intro_{q['№']}", math.ceil(remaining))
+    if "intro_t0" not in ss: ss.intro_t0 = time.time()
+    rem = INTRO_REST_SEC - (time.time() - ss.intro_t0)
+    if rem <= 0:
+        ss.pop("intro_t0"); ss.phase = "question"; ss.t0 = time.time(); st.experimental_rerun()
+    render_timer(f"intro_{q['№']}", math.ceil(rem))
     st.markdown(INTRO_CORNERS_TIMED if q["qtype"] == "corners" else INTRO_LETTERS_TIMED, unsafe_allow_html=True)
-    fetch_png(q["img"])
-    st.stop()
+    fetch_png(q["img"]); st.stop()
 
-if "t0" not in ss:
-    ss.t0 = time.time()
-remaining = max(0, TIME_IMG_VISIBLE - (time.time() - ss.t0))
+if "t0" not in ss: ss.t0 = time.time()
+rem = max(0, TIME_IMG_VISIBLE - (time.time() - ss.t0))
 st.markdown(f"### Вопрос №{q['№']} из {len(ss.seq)}")
-render_timer(f"q_{q['№']}", math.ceil(remaining))
+render_timer(f"q_{q['№']}", math.ceil(rem))
 
-if remaining > 0:
+if rem > 0:
     st.image(io.BytesIO(fetch_png(q["img"])), width=300)
 else:
     st.markdown("*Время показа изображения истекло.*")
@@ -201,15 +177,13 @@ st.markdown("---")
 
 if q["qtype"] == "corners":
     opt = st.radio(q["prompt"], ["Да, углы одного цвета.", "Нет, углы окрашены в разные цвета.", "Затрудняюсь ответить."], index=None)
-    if opt:
-        save("да" if opt.startswith("Да") else "нет" if opt.startswith("Нет") else "затрудняюсь")
+    if opt: save("да" if opt.startswith("Да") else "нет" if opt.startswith("Нет") else "затрудняюсь")
 else:
     txt = st.text_input(q["prompt"])
-    if st.button("Не вижу букв"):
-        save("Не вижу")
-    if txt and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt):
-        save(txt.strip())
-
+    if st.button("Не вижу букв"): save("Не вижу")
+    if txt:
+        if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt): save(txt.strip())
+        else: st.error("Допустимы только русские буквы и знаки пунктуации.")
 
 
 
