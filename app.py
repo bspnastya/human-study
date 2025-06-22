@@ -12,15 +12,9 @@ st.set_page_config(page_title="Визуализация многоканальн
                    page_icon="🎯", layout="centered",
                    initial_sidebar_state="collapsed")
 
-components.html("""
-<script>
-(function() {
-  const flag = '""" + MOBILE_QS_FLAG + """', isMobile = window.innerWidth < 1024;
-  if (isMobile) document.documentElement.classList.add('mobile-client');
-  const qs = new URLSearchParams(window.location.search);
-  if (isMobile && !qs.has(flag)) { qs.set(flag,'1'); window.location.search = qs.toString(); }
-})();
-</script>""", height=0)
+
+mobile_script = '<script>(function(){const flag="' + MOBILE_QS_FLAG + '",isMobile=window.innerWidth<1024;if(isMobile){document.documentElement.classList.add("mobile-client");const qs=new URLSearchParams(window.location.search);if(!qs.has(flag)){qs.set(flag,"1");window.location.search=qs.toString();}}}());</script>'
+components.html(mobile_script, height=0)
 
 q = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
 if q.get(MOBILE_QS_FLAG) == ["1"]:
@@ -35,8 +29,7 @@ if q.get(MOBILE_QS_FLAG) == ["1"]:
 
 BASE_URL         = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT       = 15
-INTRO_TIME_REST  = 3      
-REFRESH_INTERVAL = 500
+INTRO_TIME_REST  = 3
 
 st.markdown("""
 <style>
@@ -46,6 +39,7 @@ html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{
 body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
 h1,h2,h3,h4,h5,h6{color:#111!important;}
 header[data-testid="stHeader"]{display:none;}
+div[data-testid="stSidebar"]{display:none;}
 .stButton>button{min-height:52px!important;padding:0 20px!important;border:1px solid #555!important;background:#222!important;color:#ddd!important;border-radius:8px;}
 input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;font-size:1.05rem;}
 #mobile-overlay{position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;color:#fff;font:500 1.2rem/1.5 sans-serif;text-align:center;padding:0 20px;background:#808080;}
@@ -54,31 +48,9 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
   .block-container > .element-container:nth-child(n+2){display:none!important;}
   html,body{overflow:hidden!important;height:100%!important;}
 }
-.stApp > div{-webkit-backface-visibility:hidden;backface-visibility:hidden;}
 </style>
 <div id="mobile-overlay">Уважаемый&nbsp;участник,<br>данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.</div>
 """, unsafe_allow_html=True)
-
-def render_timer(sec:int, tid:str):
-    components.html(f"""
-    <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-8px;">
-      Осталось&nbsp;времени: <span id="timer-{tid}">{sec}</span>&nbsp;сек
-    </div>
-    <script>
-    (function() {{
-        const id='timer-{tid}', span=document.getElementById(id); 
-        let t={sec};
-        if(window['i_'+id]) clearInterval(window['i_'+id]);
-        window['i_'+id]=setInterval(()=>{{
-            t--; 
-            if(span) span.textContent=Math.max(0,t);
-            if(t<=0) {{
-                clearInterval(window['i_'+id]);
-                delete window['i_'+id];
-            }}
-        }},1000);
-    }})();
-    </script>""", height=50)
 
 @st.cache_resource(show_spinner="Подключение…")
 def get_sheet():
@@ -120,17 +92,16 @@ def make_qs()->List[Dict]:
     for n,q in enumerate(seq,1): q["№"]=n
     return seq
 
-if "initialized" not in st.session_state:
-    st.session_state.update(
-        initialized=True, questions=make_qs(), idx=0, name="",
-        phase="intro", phase_start_time=None, pause_until=0)
 
-if (st.session_state.pause_until>time.time()
-        and st.session_state.idx<len(st.session_state.questions)):
-    st.markdown("<div style='text-align:center;font-size:1.5rem;color:#fff;background:#262626;padding:20px;border-radius:12px;margin-top:50px;'>Переходим к следующему вопросу...</div>", unsafe_allow_html=True)
-    stamp = int(st.session_state.pause_until)
-    st_autorefresh(interval=500, key=f"pause_{stamp}")
-    st.stop()
+if "initialized" not in st.session_state:
+    st.session_state.initialized = True
+    st.session_state.questions = make_qs()
+    st.session_state.idx = 0
+    st.session_state.name = ""
+    st.session_state.phase = "intro"
+    st.session_state.phase_start_time = None
+    st.session_state.pause_until = 0
+
 
 if not st.session_state.name:
     st.markdown("""
@@ -153,7 +124,16 @@ if not st.session_state.name:
     if st.button("🎲 Сгенерировать псевдоним"):
         st.session_state.name=f"Участник_{secrets.randbelow(900000)+100000}"
         st.rerun()
-    if u: st.session_state.name=u.strip(); st.rerun()
+    if u: 
+        st.session_state.name=u.strip()
+        st.session_state.phase="intro"
+        st.rerun()
+    st.stop()
+
+
+if st.session_state.pause_until > time.time():
+    st.markdown("<div style='text-align:center;font-size:1.5rem;color:#fff;background:#262626;padding:20px;border-radius:12px;margin-top:50px;'>Переходим к следующему вопросу...</div>", unsafe_allow_html=True)
+    st_autorefresh(interval=500, key=f"pause_{int(st.session_state.pause_until)}")
     st.stop()
 
 def finish(a:str):
@@ -161,21 +141,28 @@ def finish(a:str):
     t_ms=int((time.time()-st.session_state.phase_start_time)*1000) if st.session_state.phase_start_time else 0
     ok=(clean(a)==clean(q["correct"]) if q["qtype"]=="letters" else a.lower()==q["correct"].lower())
     log_q.put([datetime.datetime.utcnow().isoformat(),st.session_state.name,q["№"],q["group"],q["alg"],q["qtype"],q["prompt"],a,q["correct"],t_ms,ok])
-    st.session_state.update(idx=st.session_state.idx+1, phase="intro",
-                            phase_start_time=None, pause_until=time.time()+0.5)
+    st.session_state.idx += 1
+    st.session_state.phase = "intro"
+    st.session_state.phase_start_time = None
+    st.session_state.pause_until = time.time() + 0.5
     st.rerun()
 
-qs,total=st.session_state.questions,len(st.session_state.questions)
-idx      =st.session_state.idx
-if idx>=total:
+qs = st.session_state.questions
+total = len(qs)
+idx = st.session_state.idx
+
+
+if idx >= total:
     st.markdown("<div style='margin-top:50px;padding:40px;text-align:center;font-size:2rem;color:#fff;background:#262626;border-radius:12px;'>Вы завершили прохождение.<br><b>Спасибо за участие!</b></div>", unsafe_allow_html=True)
-    st.balloons(); st.stop()
+    st.balloons()
+    st.stop()
 
-cur=qs[idx]
+cur = qs[idx]
 
-if st.session_state.phase=="intro":
-    
-    if idx<5:
+
+if st.session_state.phase == "intro":
+   
+    if idx < 5:
         txt_c="""Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на диаметрально противоположные углы,
         <b>правый верхний и левый нижний</b>, и определить, окрашены ли они в один цвет.<br><br>Картинка будет доступна
         в течение <b>15&nbsp;секунд</b>. Время на ответ не ограничено."""
@@ -184,19 +171,26 @@ if st.session_state.phase=="intro":
         пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>На некоторых картинках букв нет — тогда
         нажмите кнопку <b>«Не вижу букв»</b>."""
         st.markdown(f"<div style='font-size:1.1rem;line-height:1.6;margin-bottom:30px;'>{txt_c if cur['qtype']=='corners' else txt_l}</div>", unsafe_allow_html=True)
-        if st.button("Перейти к вопросу",key=f"go_{idx}"):
-            st.session_state.update(phase="question", phase_start_time=None); st.rerun()
+        if st.button("Перейти к вопросу", key=f"go_{idx}"):
+            st.session_state.phase = "question"
+            st.session_state.phase_start_time = time.time()
+            st.rerun()
         st.stop()
-
+    
+к
     if st.session_state.phase_start_time is None:
-        st.session_state.phase_start_time=time.time()
-
+        st.session_state.phase_start_time = time.time()
+    
     remaining = INTRO_TIME_REST - (time.time() - st.session_state.phase_start_time)
     if remaining <= 0:
-        st.session_state.update(phase="question", phase_start_time=None)
+        st.session_state.phase = "question"
+        st.session_state.phase_start_time = time.time()
         st.rerun()
+    
 
-    render_timer(math.ceil(remaining), f"intro_{idx}")
+    timer_html = f'<div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;">Осталось&nbsp;времени: {math.ceil(remaining)}&nbsp;сек</div>'
+    st.markdown(timer_html, unsafe_allow_html=True)
+    
 
     if cur["qtype"]=="corners":
         st.markdown("""
@@ -215,52 +209,54 @@ if st.session_state.phase=="intro":
           пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>На некоторых картинках букв нет —
           тогда нажмите кнопку <b>«Не вижу букв»</b>.
         </div>""", unsafe_allow_html=True)
-
-    st_autorefresh(interval=REFRESH_INTERVAL, key=f"intro_refresh_{idx}")
+    
+    st_autorefresh(interval=500, key=f"intro_{idx}")
     st.stop()
 
+
 if st.session_state.phase_start_time is None:
-    st.session_state.phase_start_time=time.time()
-elapsed   = time.time()-st.session_state.phase_start_time
-remaining = max(0, TIME_LIMIT-elapsed)
+    st.session_state.phase_start_time = time.time()
+
+elapsed = time.time() - st.session_state.phase_start_time
+remaining = max(0, TIME_LIMIT - elapsed)
 
 st.markdown(f"### Вопрос №{cur['№']} из {total}")
-render_timer(math.ceil(remaining), f"question_{idx}")
+
+
+timer_html = f'<div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;">Осталось&nbsp;времени: {math.ceil(remaining)}&nbsp;сек</div>'
+st.markdown(timer_html, unsafe_allow_html=True)
+
 
 with st.container():
-    if remaining>0:
-        components.html(f"""
-        <div id="img_{idx}" style="text-align:left;margin:5px 0;">
-          <img src="{cur['img']}" width="300" style="border:1px solid #444;border-radius:8px;">
-        </div>
-        <script>
-          setTimeout(()=>{{const c=document.getElementById('img_{idx}');
-            if(c)c.innerHTML='<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';}},
-            {TIME_LIMIT*1000});
-        </script>""", height=310)
+    if remaining > 0:
+        st.image(cur['img'], width=300)
     else:
         st.markdown("<div style='text-align:left;font-style:italic;color:#666;padding:40px 0;'>Время показа изображения истекло.</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-if cur["qtype"]=="corners":
-    sel=st.radio(cur["prompt"],
-                 ["Да, углы одного цвета.","Нет, углы окрашены в разные цвета.","Затрудняюсь ответить."],
-                 index=None, key=f"r_{idx}")
+
+if cur["qtype"] == "corners":
+    sel = st.radio(cur["prompt"],
+                   ["Да, углы одного цвета.", "Нет, углы окрашены в разные цвета.", "Затрудняюсь ответить."],
+                   index=None, key=f"r_{idx}")
     if sel:
         finish("да" if sel.startswith("Да") else "нет" if sel.startswith("Нет") else "затрудняюсь")
 else:
-    txt=st.text_input(cur["prompt"], key=f"t_{idx}", placeholder="Введите русские буквы и нажмите Enter")
-    col1,_=st.columns([1,3])
+    txt = st.text_input(cur["prompt"], key=f"t_{idx}", placeholder="Введите русские буквы и нажмите Enter")
+    col1, _ = st.columns([1, 3])
     with col1:
-        if st.button("Не вижу букв", key=f"s_{idx}"): finish("Не вижу")
+        if st.button("Не вижу букв", key=f"s_{idx}"): 
+            finish("Не вижу")
     if txt:
-        if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt): finish(txt.strip())
-        else: st.error("Допустимы только русские буквы и знаки пунктуации.")
+        if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+", txt): 
+            finish(txt.strip())
+        else: 
+            st.error("Допустимы только русские буквы и знаки пунктуации.")
 
-if remaining>0:
-    st_autorefresh(interval=1000, key=f"question_refresh_{idx}")
 
+if remaining > 0:
+    st_autorefresh(interval=1000, key=f"question_{idx}")
 
 
 
