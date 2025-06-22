@@ -127,7 +127,8 @@ if "initialized" not in st.session_state:
 if (st.session_state.pause_until>time.time()
         and st.session_state.idx<len(st.session_state.questions)):
     st.markdown("<div style='text-align:center;font-size:1.5rem;color:#fff;background:#262626;padding:20px;border-radius:12px;margin-top:50px;'>Переходим к следующему вопросу...</div>", unsafe_allow_html=True)
-    st_autorefresh(interval=200, key=f"pause_refresh_{st.session_state.idx}")
+    stamp = int(st.session_state.pause_until)
+    st_autorefresh(interval=500, key=f"pause_{stamp}")
     st.stop()
 
 
