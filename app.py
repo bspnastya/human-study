@@ -177,7 +177,7 @@ if st.session_state.phase == "intro":
             st.rerun()
         st.stop()
     
-к
+
     if st.session_state.phase_start_time is None:
         st.session_state.phase_start_time = time.time()
     
