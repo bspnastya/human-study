@@ -12,15 +12,15 @@ st.set_page_config(page_title="Визуализация многоканальн
                    page_icon="🎯", layout="centered",
                    initial_sidebar_state="collapsed")
 
-mobile_check = """<script>
-(function() {
-  const flag = '""" + MOBILE_QS_FLAG + """', isMobile = window.innerWidth < 1024;
+components.html(f"""
+<script>
+(function() {{
+  const flag = '{MOBILE_QS_FLAG}', isMobile = window.innerWidth < 1024;
   if (isMobile) document.documentElement.classList.add('mobile-client');
   const qs = new URLSearchParams(window.location.search);
-  if (isMobile && !qs.has(flag)) { qs.set(flag,'1'); window.location.search = qs.toString(); }
-})();
-</script>"""
-components.html(mobile_check, height=0)
+  if (isMobile && !qs.has(flag)) {{ qs.set(flag,'1'); window.location.search = qs.toString(); }}
+}})();
+</script>""", height=0)
 
 q = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
 if q.get(MOBILE_QS_FLAG) == ["1"]:
@@ -37,6 +37,7 @@ BASE_URL         = "https://storage.yandexcloud.net/test3123234442"
 TIME_LIMIT       = 15
 INTRO_TIME_REST  = 3      
 REFRESH_INTERVAL = 500
+
 
 st.markdown("""
 <style>
@@ -59,21 +60,21 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
 <div id="mobile-overlay">Уважаемый&nbsp;участник,<br>данное&nbsp;исследование доступно для прохождения только с&nbsp;ПК или&nbsp;ноутбука.</div>
 """, unsafe_allow_html=True)
 
+
 def render_timer(sec:int, tid:str):
-    timer_script = """
+    components.html(f"""
     <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-8px;">
-      Осталось&nbsp;времени: <span id="timer-""" + tid + """">""" + str(sec) + """</span>&nbsp;сек
+      Осталось&nbsp;времени: <span id="timer-{tid}">{sec}</span>&nbsp;сек
     </div>
     <script>
-    (function() {
-        const id='timer-""" + tid + """', span=document.getElementById(id); let t=""" + str(sec) + """;
+    (function() {{
+        const id='timer-{tid}', span=document.getElementById(id); let t={sec};
         if(window['i_'+id]) clearInterval(window['i_'+id]);
-        window['i_'+id]=setInterval(()=>{t--; if(span) span.textContent=Math.max(0,t);
-            if(t<=0) clearInterval(window['i_'+id]);},1000);
-        window.addEventListener('beforeunload',()=>{if(window['i_'+id]) clearInterval(window['i_'+id]);});
-    })();
-    </script>"""
-    components.html(timer_script, height=50)
+        window['i_'+id]=setInterval(()=>{{t--; if(span) span.textContent=Math.max(0,t);
+            if(t<=0) clearInterval(window['i_'+id]);}},1000);
+        window.addEventListener('beforeunload',()=>{{if(window['i_'+id]) clearInterval(window['i_'+id]);}});
+    }})();
+    </script>""", height=50)
 
 @st.cache_resource(show_spinner="Подключение…")
 def get_sheet():
@@ -93,6 +94,7 @@ def writer():
             log_q.task_done()
         except: pass
 threading.Thread(target=writer, daemon=True).start()
+
 
 GROUPS=["img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb","img4_same_corners","img5_same_corners"]
 ALGS  =["pca_rgb_result","socolov_lab_result","socolov_rgb_result","umap_rgb_result"]
@@ -115,10 +117,12 @@ def make_qs()->List[Dict]:
     for n,q in enumerate(seq,1): q["№"]=n
     return seq
 
+
 if "initialized" not in st.session_state:
     st.session_state.update(
         initialized=True, questions=make_qs(), idx=0, name="",
         phase="intro", phase_start_time=None, pause_until=0)
+
 
 if (st.session_state.pause_until>time.time()
         and st.session_state.idx<len(st.session_state.questions)):
@@ -126,6 +130,7 @@ if (st.session_state.pause_until>time.time()
     stamp = int(st.session_state.pause_until)
     st_autorefresh(interval=500, key=f"pause_{stamp}")
     st.stop()
+
 
 if not st.session_state.name:
     st.markdown("""
@@ -151,6 +156,7 @@ if not st.session_state.name:
     if u: st.session_state.name=u.strip(); st.rerun()
     st.stop()
 
+
 def finish(a:str):
     q=st.session_state.questions[st.session_state.idx]
     t_ms=int((time.time()-st.session_state.phase_start_time)*1000) if st.session_state.phase_start_time else 0
@@ -167,6 +173,7 @@ if idx>=total:
     st.balloons(); st.stop()
 
 cur=qs[idx]
+
 
 if st.session_state.phase=="intro":
     
@@ -189,7 +196,7 @@ if st.session_state.phase=="intro":
     remaining = INTRO_TIME_REST - (time.time() - st.session_state.phase_start_time)
     if remaining <= 0:
         st.session_state.update(phase="question", phase_start_time=None)
-        st.rerun()
+        st.experimental_rerun()
 
     render_timer(math.ceil(remaining), f"intro_{idx}")
 
@@ -224,16 +231,15 @@ render_timer(math.ceil(remaining), f"question_{idx}")
 
 with st.container():
     if remaining>0:
-        img_script = """
-        <div id="img_""" + str(idx) + """" style="text-align:left;margin:5px 0;">
-          <img src=\"""" + cur['img'] + """\" width="300" style="border:1px solid #444;border-radius:8px;">
+        components.html(f"""
+        <div id="img_{idx}" style="text-align:left;margin:5px 0;">
+          <img src="{cur['img']}" width="300" style="border:1px solid #444;border-radius:8px;">
         </div>
         <script>
-          setTimeout(()=>{const c=document.getElementById('img_""" + str(idx) + """');
-            if(c)c.innerHTML='<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';},
-            """ + str(TIME_LIMIT*1000) + """);
-        </script>"""
-        components.html(img_script, height=310)
+          setTimeout(()=>{{const c=document.getElementById('img_{idx}');
+            if(c)c.innerHTML='<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';}},
+            {TIME_LIMIT*1000});
+        </script>""", height=310)
     else:
         st.markdown("<div style='text-align:left;font-style:italic;color:#666;padding:40px 0;'>Время показа изображения истекло.</div>", unsafe_allow_html=True)
 
@@ -256,5 +262,4 @@ else:
 
 if remaining>0:
     st_autorefresh(interval=1000, key=f"question_refresh_{idx}")
-
 
