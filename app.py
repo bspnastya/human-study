@@ -77,15 +77,14 @@ SHEET=get_sheet()
 
 log_q=queue.Queue()
 def writer():
-    batch=[]
     while True:
-        r=log_q.get()
-        batch.append(r)
+        row=log_q.get()
+        if SHEET:
+            try:
+                SHEET.append_row(row,value_input_option="RAW")
+            except Exception:
+                pass
         log_q.task_done()
-        if len(batch)>=5 and SHEET:
-            try:SHEET.append_rows(batch,value_input_option="RAW")
-            except Exception:pass
-            batch.clear()
 threading.Thread(target=writer,daemon=True).start()
 
 GROUPS=["img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb","img4_same_corners","img5_same_corners"]
