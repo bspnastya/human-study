@@ -12,6 +12,10 @@ st.set_page_config(page_title="Визуализация многоканальн
                    page_icon="🎯", layout="centered",
                    initial_sidebar_state="collapsed")
 
+
+if "initialized" not in st.session_state:
+    st.session_state.update(initialized=True,questions=[],idx=0,name="",phase="intro",phase_start_time=None,pause_until=0)
+
 components.html(f"""
 <script>
 (function() {{
@@ -108,8 +112,9 @@ def make_qs()->List[Dict]:
     for n,q in enumerate(seq,1):q["№"]=n
     return seq
 
-if "initialized" not in st.session_state:
-    st.session_state.update(initialized=True,questions=make_qs(),idx=0,name="",phase="intro",phase_start_time=None,pause_until=0)
+
+if "initialized" in st.session_state and st.session_state.initialized and not st.session_state.questions:
+    st.session_state.questions = make_qs()
 
 if st.session_state.pause_until>time.time() and st.session_state.idx<len(st.session_state.questions):
     st.markdown("<div style='text-align:center;font-size:1.5rem;color:#fff;background:#262626;padding:20px;border-radius:12px;margin-top:50px;'>Переходим к следующему вопросу...</div>",unsafe_allow_html=True)
@@ -210,7 +215,5 @@ else:
 
 if remaining>0:
     st_autorefresh(interval=1000,key=f"question_refresh_{idx}")
-
-
 
 
