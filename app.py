@@ -45,7 +45,7 @@ st.markdown("""
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{background:#808080!important;color:#111!important;}
 h1,h2,h3,h4,h5,h6,p,label,li,span{color:#111!important;}
 header[data-testid="stHeader"]{display:none;}
-.stButton>button{min-height:52px;padding:0 20px;border:1px solid #555;background:#222;color:#ddd;border-radius:8px;}
+.stButton>button{min-height:52px;padding:0 20px;border:1px solid #555;background:#222;color:#fff;border-radius:8px;}
 input[data-testid="stTextInput"]{height:52px;padding:0 16px;font-size:1.05rem;}
 </style>
 """,unsafe_allow_html=True)
@@ -106,17 +106,20 @@ def make_qs():
     return seq
 if not st.session_state.questions: st.session_state.questions=make_qs()
 
-def render_timer(sec,tid):
-    if tid in st.session_state._timer_flags: return
-    components.html(f"""
-    <div style="font-size:1.2rem;font-weight:bold;margin-bottom:10px;">
-      Осталось&nbsp;времени: <span id="t{tid}">{sec}</span>&nbsp;сек
+def render_timer(sec:str, tid:str):
+    st.markdown(f"""
+    <div id="timer-{tid}" style="display:flex;justify-content:center;margin:8px 0 18px 0;">
+      <div style="font-size:20px;font-weight:700;">Осталось&nbsp;времени:&nbsp;<span id="t{tid}">{sec}</span>&nbsp;сек</div>
     </div>
     <script>
-      let t={sec};const s=document.getElementById('t{tid}');
-      const i=setInterval(()=>{{if(--t<0){{clearInterval(i);return;}}s.textContent=t;}},1000);
-    </script>""",height=50)
-    st.session_state._timer_flags[tid]=True
+      let t{tid} = {sec};
+      const s{tid} = document.getElementById('t{tid}');
+      const i{tid} = setInterval(() => {{
+          if (--t{tid} < 0) {{ clearInterval(i{tid}); return; }}
+          if (s{tid}) s{tid}.innerText = t{tid};
+      }}, 1000);
+    </script>
+    """, unsafe_allow_html=True)
 
 def log_row(ans):
     q=st.session_state.questions[st.session_state.idx]
@@ -176,8 +179,8 @@ if st.session_state.phase=="intro":
         st.rerun()
     st.stop()
 
-render_timer(TIME_LIMIT,str(idx))
 st.markdown(f"### Вопрос №{q['№']} из {total}")
+render_timer(TIME_LIMIT, str(idx))
 
 remain=TIME_LIMIT-(time.time()-st.session_state.phase_start_time)
 placeholder=st.empty()
