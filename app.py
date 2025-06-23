@@ -9,9 +9,11 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 import os
 from pathlib import Path
+import atexit
 
 MOBILE_QS_FLAG="mobile"
 st.set_page_config(page_title="Визуализация многоканальных изображений",page_icon="🎯",layout="centered",initial_sidebar_state="collapsed")
+
 
 if "initialized" not in st.session_state:
     st.session_state.update(
@@ -27,19 +29,23 @@ if "initialized" not in st.session_state:
     )
 
 
-if 'global_log_queue' not in globals():
-    global_log_queue = queue.Queue()
+import sys
+module = sys.modules[__name__]
+
+if not hasattr(module, '_queues_initialized'):
+    module._queues_initialized = True
+    module.global_log_queue = queue.Queue(maxsize=1000)  
+    module.batch_queue = queue.Queue(maxsize=1000)
     
-   
-    batch_queue = queue.Queue()
-    BATCH_SIZE = 5  
-    BATCH_TIMEOUT = 3 
+    BATCH_SIZE = 5 
+    BATCH_TIMEOUT = 3  
     
-   
+
     BACKUP_DIR = Path("backup_results")
     BACKUP_DIR.mkdir(exist_ok=True)
     
     def save_to_backup(row):
+
         timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         filename = BACKUP_DIR / f"backup_{timestamp}_{secrets.token_hex(4)}.json"
         try:
@@ -49,70 +55,104 @@ if 'global_log_queue' not in globals():
             pass
     
     def batch_writer():
+ 
         batch = []
         last_send = time.time()
+        consecutive_errors = 0
         
         while True:
             try:
-              
-                row = batch_queue.get(timeout=1)
+            
+                timeout = 0.1 if batch else 1 
+                row = module.batch_queue.get(timeout=timeout)
                 batch.append(row)
                 
-        
+           
                 if len(batch) >= BATCH_SIZE or (time.time() - last_send > BATCH_TIMEOUT and batch):
                     sheet = get_sheet()
                     if sheet:
                         try:
-                            
-                            sheet.append_rows(batch, value_input_option="RAW")
+                        
+                            sheet.append_rows(batch, value_input_option="RAW", table_range="A1")
                             batch = []
                             last_send = time.time()
+                            consecutive_errors = 0
                         except Exception as e:
-                           
+                         
                             for r in batch:
                                 save_to_backup(r)
                             batch = []
-                            time.sleep(2)  
+                            consecutive_errors += 1
+                          
+                            time.sleep(min(30, 2 ** consecutive_errors))
                     else:
-                      
+                        
                         for r in batch:
                             save_to_backup(r)
                         batch = []
+                        time.sleep(5) 
                         
             except queue.Empty:
-            
+                
                 if batch and time.time() - last_send > BATCH_TIMEOUT:
                     sheet = get_sheet()
                     if sheet:
                         try:
-                            sheet.append_rows(batch, value_input_option="RAW")
+                            sheet.append_rows(batch, value_input_option="RAW", table_range="A1")
+                            consecutive_errors = 0
                         except:
                             for r in batch:
                                 save_to_backup(r)
+                            consecutive_errors += 1
                     else:
                         for r in batch:
                             save_to_backup(r)
                     batch = []
                     last_send = time.time()
+            except Exception:
+
+                time.sleep(1)
     
     def queue_processor():
+      
         while True:
-            row = global_log_queue.get()
-            batch_queue.put(row)
-            global_log_queue.task_done()
+            try:
+                row = module.global_log_queue.get(timeout=1)
+       
+                try:
+                    module.batch_queue.put(row, timeout=1)
+                except queue.Full:
+                  
+                    save_to_backup(row)
+                module.global_log_queue.task_done()
+            except queue.Empty:
+                continue
+            except Exception:
+                time.sleep(0.1)
     
-    threading.Thread(target=queue_processor, daemon=True).start()
-    threading.Thread(target=batch_writer, daemon=True).start()
 
-components.html("""
-<script>
-(function(){{
-  const flag='{flag}',isMobile=window.innerWidth<1024;
-  if(isMobile)document.documentElement.classList.add('mobile-client');
-  const qs=new URLSearchParams(window.location.search);
-  if(isMobile&&!qs.has(flag)){{qs.set(flag,'1');window.location.search=qs.toString();}}
-}})();
-</script>""".format(flag=MOBILE_QS_FLAG),height=0)
+    thread1 = threading.Thread(target=queue_processor, daemon=True, name="QueueProcessor")
+    thread2 = threading.Thread(target=batch_writer, daemon=True, name="BatchWriter")
+    thread1.start()
+    thread2.start()
+
+
+try:
+    components.html("""
+    <script>
+    (function(){{
+      try {{
+        const flag='{flag}',isMobile=window.innerWidth<1024;
+        if(isMobile)document.documentElement.classList.add('mobile-client');
+        const qs=new URLSearchParams(window.location.search);
+        if(isMobile&&!qs.has(flag)){{qs.set(flag,'1');window.location.search=qs.toString();}}
+      }} catch(e) {{
+        console.error('Mobile check error:', e);
+      }}
+    }})();
+    </script>""".format(flag=MOBILE_QS_FLAG),height=0)
+except Exception:
+    pass
 
 q=st.query_params if hasattr(st,"query_params") else st.experimental_get_query_params()
 if q.get(MOBILE_QS_FLAG)==["1"]:
@@ -144,24 +184,49 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
 """,unsafe_allow_html=True)
 
 def render_timer(sec:int,tid:str):
-    if tid in st.session_state["_timer_flags"]:
+    if tid in st.session_state.get("_timer_flags", {}):
         return
-    components.html(f"""
-    <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-8px;">
-      Осталось&nbsp;времени: <span id="t{tid}">{sec}</span>&nbsp;сек
+
+    timer_placeholder = st.empty()
+    timer_placeholder.markdown(f"""
+    <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;">
+      Осталось&nbsp;времени: <span id="timer_{tid}">{sec}</span>&nbsp;сек
     </div>
+    """, unsafe_allow_html=True)
+    
+
+    components.html(f"""
     <script>
       (function(){{
-        let t={sec};
-        const span=document.getElementById('t{tid}');
-        const iv=setInterval(()=>{{if(--t<0){{clearInterval(iv);return;}}if(span)span.textContent=t;}},1000);
+       
+        function startTimer() {{
+          let t={sec};
+          const span=document.getElementById('timer_{tid}');
+          if(!span) {{
+            setTimeout(startTimer, 100);
+            return;
+          }}
+          const iv=setInterval(()=>{{
+            if(--t<0){{clearInterval(iv);return;}}
+            if(span)span.textContent=t;
+          }},1000);
+        }}
+        
+        if(document.readyState === 'loading') {{
+          document.addEventListener('DOMContentLoaded', startTimer);
+        }} else {{
+          startTimer();
+        }}
       }})();
-    </script>""",height=50)
-    st.session_state["_timer_flags"][tid]=True
+    </script>""", height=0)
+    
+    if "_timer_flags" not in st.session_state:
+        st.session_state._timer_flags = {}
+    st.session_state._timer_flags[tid]=True
 
 @st.cache_resource(show_spinner="Подключение…")
 def get_sheet():
-   
+
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -187,7 +252,7 @@ def clean(s:str)->set[str]:return set(re.sub(r"[ ,.;:-]+","",s.lower()))
 
 @st.cache_data
 def get_question_template():
-    """Создаем шаблон вопросов один раз и кэшируем"""
+
     pg={g:[] for g in GROUPS}
     for g,a in itertools.product(GROUPS,ALGS):
         pg[g]+=[
@@ -197,8 +262,14 @@ def get_question_template():
     return pg
 
 def make_qs()->List[Dict]:
-    pg = {k: v.copy() for k, v in get_question_template().items()}
-    for v in pg.values():random.shuffle(v)
+
+    pg = {}
+    template = get_question_template()
+    for k, v in template.items():
+        pg[k] = [item.copy() for item in v] 
+    
+    for v in pg.values():
+        random.shuffle(v)
     seq,prev=[],None
     while any(pg.values()):
         choices=[g for g in GROUPS if pg[g] and g!=prev] or [g for g in GROUPS if pg[g]]
@@ -242,21 +313,38 @@ def finish(a:str):
     t_ms=int((time.time()-st.session_state.phase_start_time)*1000) if st.session_state.phase_start_time else 0
     ok=(clean(a)==clean(q["correct"]) if q["qtype"]=="letters" else a.lower()==q["correct"].lower())
     
-
-    global_log_queue.put([
-        datetime.datetime.utcnow().isoformat(),
-        st.session_state.name,
-        q["№"],
-        q["group"],
-        q["alg"],
-        q["qtype"],
-        q["prompt"],
-        a,
-        q["correct"],
-        t_ms,
-        ok,
-        st.session_state.session_id  
-    ])
+  
+    try:
+        module.global_log_queue.put([
+            datetime.datetime.utcnow().isoformat(),
+            st.session_state.name,
+            q["№"],
+            q["group"],
+            q["alg"],
+            q["qtype"],
+            q["prompt"],
+            a,
+            q["correct"],
+            t_ms,
+            ok,
+            st.session_state.session_id  
+        ], timeout=1)
+    except queue.Full:
+      
+        save_to_backup([
+            datetime.datetime.utcnow().isoformat(),
+            st.session_state.name,
+            q["№"],
+            q["group"],
+            q["alg"],
+            q["qtype"],
+            q["prompt"],
+            a,
+            q["correct"],
+            t_ms,
+            ok,
+            st.session_state.session_id
+        ])
     
     st.session_state.update(idx=st.session_state.idx+1,phase="intro",phase_start_time=None,pause_until=time.time()+0.5)
     st.rerun()
@@ -290,43 +378,67 @@ elapsed=time.time()-st.session_state.phase_start_time
 remaining=max(0,TIME_LIMIT-elapsed)
 
 st.markdown(f"### Вопрос №{cur['№']} из {total}")
-render_timer(math.ceil(remaining),f"{idx}")
 
-with st.container():
+
+answer_container = st.container()
+with answer_container:
+    if cur["qtype"]=="corners":
+        sel=st.radio(cur["prompt"],["Да, углы одного цвета.","Нет, углы окрашены в разные цвета.","Затрудняюсь ответить."],index=None,key=f"r_{idx}")
+        if sel:
+            finish("да" if sel.startswith("Да") else "нет" if sel.startswith("Нет") else "затрудняюсь")
+    else:
+        txt=st.text_input(cur["prompt"],key=f"t_{idx}",placeholder="Введите русские буквы и нажмите Enter")
+        col1,_=st.columns([1,3])
+        with col1:
+            if st.button("Не вижу букв",key=f"s_{idx}"):
+                finish("Не вижу")
+        if txt:
+            if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+                finish(txt.strip())
+            else:
+                st.error("Допустимы только русские буквы и знаки пунктуации.")
+
+
+st.markdown("---")
+
+
+timer_container = st.container()
+with timer_container:
+    render_timer(math.ceil(remaining),f"{idx}")
+
+image_container = st.container()
+with image_container:
     if remaining>0:
+     
         components.html(f"""
-        <div id="img_{idx}" style="text-align:left;margin:5px 0;">
-          <img src="{cur['img']}" width="300" style="border:1px solid #444;border-radius:8px;">
+        <div id="img_{idx}" style="text-align:left;margin:5px 0;opacity:0;transition:opacity 0.3s;">
+          <img src="{cur['img']}" width="300" style="border:1px solid #444;border-radius:8px;" 
+               onload="this.parentElement.style.opacity='1';">
         </div>
         <script>
-          setTimeout(()=>{{const c=document.getElementById('img_{idx}');
-            if(c)c.innerHTML='<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';}},
-            {TIME_LIMIT*1000});
+    
+          if(document.readyState === 'loading') {{
+            document.addEventListener('DOMContentLoaded', function() {{
+              setTimeout(()=>{{
+                const c=document.getElementById('img_{idx}');
+                if(c)c.innerHTML='<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';
+              }}, {TIME_LIMIT*1000});
+            }});
+          }} else {{
+            setTimeout(()=>{{
+              const c=document.getElementById('img_{idx}');
+              if(c)c.innerHTML='<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';
+            }}, {TIME_LIMIT*1000});
+          }}
         </script>""",height=310)
     else:
         st.markdown("<div style='text-align:left;font-style:italic;color:#666;padding:40px 0;'>Время показа изображения истекло.</div>",unsafe_allow_html=True)
 
-st.markdown("---")
-
-if cur["qtype"]=="corners":
-    sel=st.radio(cur["prompt"],["Да, углы одного цвета.","Нет, углы окрашены в разные цвета.","Затрудняюсь ответить."],index=None,key=f"r_{idx}")
-    if sel:
-        finish("да" if sel.startswith("Да") else "нет" if sel.startswith("Нет") else "затрудняюсь")
-else:
-    txt=st.text_input(cur["prompt"],key=f"t_{idx}",placeholder="Введите русские буквы и нажмите Enter")
-    col1,_=st.columns([1,3])
-    with col1:
-        if st.button("Не вижу букв",key=f"s_{idx}"):
-            finish("Не вижу")
-    if txt:
-        if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
-            finish(txt.strip())
-        else:
-            st.error("Допустимы только русские буквы и знаки пунктуации.")
-
 
 def restore_backups():
-    if 'BACKUP_DIR' in globals():
+   
+    BACKUP_DIR = Path("backup_results")
+    if BACKUP_DIR.exists():
         sheet = get_sheet()
         if not sheet:
             print("Нет подключения к Google Sheets")
