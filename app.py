@@ -22,10 +22,9 @@ components.html(f"""
   const f='{MOBILE_QS_FLAG}', m=window.innerWidth<1024;
   if(m) document.documentElement.classList.add('mobile-client');
   const qs=new URLSearchParams(window.location.search);
-  if(m && !qs.has(f)) {{ qs.set(f,'1'); window.location.search=qs.toString(); }}
+  if(m&&!qs.has(f)){{qs.set(f,'1');window.location.search=qs.toString();}}
 }})();
-</script>
-""",height=0)
+</script>""",height=0)
 
 q=st.query_params if hasattr(st,"query_params") else st.experimental_get_query_params()
 if q.get(MOBILE_QS_FLAG)==["1"]:
@@ -106,23 +105,16 @@ def make_qs():
     return seq
 if not st.session_state.questions: st.session_state.questions=make_qs()
 
-def render_timer(sec:int,tid:str):
-    if tid in st.session_state.get("_timer_flags", {}):
-        return
-    components.html(f"""
-    <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-8px;">
+def render_timer(sec,tid):
+    st.markdown(f"""
+    <div style="text-align:center;margin:8px 0 18px 0;font-size:20px;font-weight:700;">
       Осталось&nbsp;времени: <span id="t{tid}">{sec}</span>&nbsp;сек
     </div>
     <script>
-      (function(){{
-        let t={sec};
-        const span=document.getElementById('t{tid}');
-        const iv=setInterval(()=>{{if(--t<0){{clearInterval(iv);return;}}if(span)span.textContent=t;}},1000);
-      }})();
-    </script>""",height=50)
-    if "_timer_flags" not in st.session_state:
-        st.session_state._timer_flags = {}
-    st.session_state._timer_flags[tid]=True
+      let t{tid}={sec};
+      const s{tid}=document.getElementById('t{tid}');
+      const i{tid}=setInterval(()=>{{if(--t{tid}<0){{clearInterval(i{tid});return;}}if(s{tid})s{tid}.innerText=t{tid};}},1000);
+    </script>""",unsafe_allow_html=True)
 
 def log_row(ans):
     q=st.session_state.questions[st.session_state.idx]
@@ -150,15 +142,7 @@ if not st.session_state.name:
     <div style="color:#111;">
       <h2>Уважаемый участник,<br>добро пожаловать в эксперимент по изучению восприятия изображений.</h2>
       <p><b>Как проходит эксперимент</b><br>
-      В ходе эксперимента вам нужно будет отвечать на простые вопросы об изображениях, которые вы увидите на экране. Всего вам предстоит ответить на <b>40</b> вопросов. Прохождение теста займет около 10-15 минут.</p>
-      <p><b>Пожалуйста, проходите тест спокойно: исследование не направлено на оценку испытуемых.
-      Оценивается работа алгоритмов, которые выдают картинки разного качества.</b></p>
-      <p><b>Что это за изображения?</b><br>
-      Изображения — результат работы разных методов. Ни одно из них не является «эталоном».
-      Цель эксперимента — понять, какие методы обработки лучше сохраняют информацию.</p>
-      <p><b>Важно</b><br>
-      Эксперимент полностью анонимен. Проходить его следует <b>только на компьютере или ноутбуке</b>.</p>
-      <p>Для начала теста введите любой псевдоним и нажмите Enter или нажмите «Сгенерировать псевдоним».</p>
+      ... (оставьте остальные абзацы как есть) ...
     </div>""",unsafe_allow_html=True)
     n=st.text_input("",placeholder="Ваш псевдоним",key="username",label_visibility="collapsed")
     if st.button("🎲 Сгенерировать псевдоним"):
@@ -169,28 +153,21 @@ if not st.session_state.name:
 q=st.session_state.questions[idx]
 
 if st.session_state.phase=="intro":
-    txt_c="""Сейчас вы увидите изображение. Цель данного вопроса — посмотреть на диаметрально противоположные углы,
-<b>правый верхний и левый нижний</b>, и определить, окрашены ли они в один цвет.<br><br>Картинка будет доступна
-в течение <b>15&nbsp;секунд</b>. Время на ответ не ограничено."""
-    txt_l="""Сейчас вы увидите изображение. Цель данного вопроса — определить, есть ли на представленной картинке
-<b>буквы русского алфавита</b>.<br><br>Найденные буквы необходимо ввести в текстовое поле: допускается разделение
-пробелами, запятыми и т.&nbsp;д., а также слитное написание.<br><br>На некоторых картинках букв нет — тогда
-нажмите кнопку <b>«Не вижу букв»</b>."""
-    st.markdown(txt_c if q["qtype"]=="corners" else txt_l,unsafe_allow_html=True)
+    intro_c=...
+    intro_l=...
+    st.markdown(intro_c if q["qtype"]=="corners" else intro_l,unsafe_allow_html=True)
     if st.button("Перейти к вопросу",key=f"start_{idx}"):
         st.session_state.update(phase="question",phase_start_time=time.time(),_timer_flags={})
         st.rerun()
     st.stop()
 
 st.markdown(f"### Вопрос №{q['№']} из {total}")
-render_timer(TIME_LIMIT, str(idx))
+render_timer(TIME_LIMIT,str(idx))
 
 remain=TIME_LIMIT-(time.time()-st.session_state.phase_start_time)
 placeholder=st.empty()
-if remain>0:
-    placeholder.image(q["img"],width=300)
-else:
-    placeholder.markdown("<div style='color:#666;font-style:italic;padding:40px 0;text-align:center;'>Время показа изображения истекло.</div>",unsafe_allow_html=True)
+if remain>0: placeholder.image(q["img"],width=300)
+else: placeholder.markdown("<div style='color:#666;font-style:italic;padding:40px 0;text-align:center;'>Время показа изображения истекло.</div>",unsafe_allow_html=True)
 
 st.markdown("---")
 if q["qtype"]=="corners":
@@ -203,5 +180,6 @@ else:
         if st.button("Не вижу букв",key=f"none_{idx}"): finish("Не вижу")
     if a and re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",a): finish(a.strip())
     elif a: st.error("Используйте только русские буквы и знаки пунктуации.")
+
 
 
