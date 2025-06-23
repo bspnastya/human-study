@@ -106,20 +106,23 @@ def make_qs():
     return seq
 if not st.session_state.questions: st.session_state.questions=make_qs()
 
-def render_timer(sec:str, tid:str):
-    st.markdown(f"""
-    <div id="timer-{tid}" style="display:flex;justify-content:center;margin:8px 0 18px 0;">
-      <div style="font-size:20px;font-weight:700;">Осталось&nbsp;времени:&nbsp;<span id="t{tid}">{sec}</span>&nbsp;сек</div>
+def render_timer(sec:int,tid:str):
+    if tid in st.session_state.get("_timer_flags", {}):
+        return
+    components.html(f"""
+    <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-8px;">
+      Осталось&nbsp;времени: <span id="t{tid}">{sec}</span>&nbsp;сек
     </div>
     <script>
-      let t{tid} = {sec};
-      const s{tid} = document.getElementById('t{tid}');
-      const i{tid} = setInterval(() => {{
-          if (--t{tid} < 0) {{ clearInterval(i{tid}); return; }}
-          if (s{tid}) s{tid}.innerText = t{tid};
-      }}, 1000);
-    </script>
-    """, unsafe_allow_html=True)
+      (function(){{
+        let t={sec};
+        const span=document.getElementById('t{tid}');
+        const iv=setInterval(()=>{{if(--t<0){{clearInterval(iv);return;}}if(span)span.textContent=t;}},1000);
+      }})();
+    </script>""",height=50)
+    if "_timer_flags" not in st.session_state:
+        st.session_state._timer_flags = {}
+    st.session_state._timer_flags[tid]=True
 
 def log_row(ans):
     q=st.session_state.questions[st.session_state.idx]
