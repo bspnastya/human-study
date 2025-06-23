@@ -282,7 +282,7 @@ def finish(a:str):
     t_ms=int((time.time()-st.session_state.phase_start_time)*1000) if st.session_state.phase_start_time else 0
     ok=(clean(a)==clean(q["correct"]) if q["qtype"]=="letters" else a.lower()==q["correct"].lower())
     
-ь
+
     try:
         module.global_log_queue.put([
             datetime.datetime.utcnow().isoformat(),
