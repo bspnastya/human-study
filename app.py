@@ -18,15 +18,15 @@ st.set_page_config(
 )
 
 components.html(
-    f'''
+    """
 <script>
 (function() {{
-  const flag='{MOBILE_QS_FLAG}', isMobile=window.innerWidth<1024;
-  if(isMobile) document.documentElement.classList.add('mobile-client');
-  const qs=new URLSearchParams(window.location.search);
-  if(isMobile&&!qs.has(flag)) {{ qs.set(flag,'1'); window.location.search=qs.toString(); }}
-})();
-</script>''',
+  const flag='{flag}', isMobile = window.innerWidth < 1024;
+  if (isMobile) document.documentElement.classList.add('mobile-client');
+  const qs = new URLSearchParams(window.location.search);
+  if (isMobile && !qs.has(flag)) {{ qs.set(flag,'1'); window.location.search = qs.toString(); }}
+}})();
+</script>""".format(flag=MOBILE_QS_FLAG),
     height=0,
 )
 
