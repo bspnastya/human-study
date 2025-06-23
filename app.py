@@ -45,7 +45,7 @@ st.markdown("""
 html,body,.stApp,[data-testid="stAppViewContainer"],.main,.block-container{background:#808080!important;color:#111!important;}
 h1,h2,h3,h4,h5,h6,p,label,li,span{color:#111!important;}
 header[data-testid="stHeader"]{display:none;}
-.stButton>button{min-height:52px;padding:0 20px;border:1px solid #555;background:#222;color:#fff;border-radius:8px;}
+.stButton>button{min-height:52px;padding:0 20px;border:1px solid #555;background:#222;color:#fff!important;border-radius:8px;}
 input[data-testid="stTextInput"]{height:52px;padding:0 16px;font-size:1.05rem;}
 </style>
 """,unsafe_allow_html=True)
