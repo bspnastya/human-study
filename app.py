@@ -34,13 +34,12 @@ module = sys.modules[__name__]
 
 if not hasattr(module, '_queues_initialized'):
     module._queues_initialized = True
-    module.global_log_queue = queue.Queue(maxsize=1000)  
+    module.global_log_queue = queue.Queue(maxsize=1000) 
     module.batch_queue = queue.Queue(maxsize=1000)
     
     BATCH_SIZE = 5 
-    BATCH_TIMEOUT = 3  
-    
-
+    BATCH_TIMEOUT = 3 
+  
     BACKUP_DIR = Path("backup_results")
     BACKUP_DIR.mkdir(exist_ok=True)
     
@@ -55,45 +54,45 @@ if not hasattr(module, '_queues_initialized'):
             pass
     
     def batch_writer():
- 
+     
         batch = []
         last_send = time.time()
         consecutive_errors = 0
         
         while True:
             try:
-            
+          
                 timeout = 0.1 if batch else 1 
                 row = module.batch_queue.get(timeout=timeout)
                 batch.append(row)
                 
-           
+                
                 if len(batch) >= BATCH_SIZE or (time.time() - last_send > BATCH_TIMEOUT and batch):
                     sheet = get_sheet()
                     if sheet:
                         try:
-                        
+                          
                             sheet.append_rows(batch, value_input_option="RAW", table_range="A1")
                             batch = []
                             last_send = time.time()
                             consecutive_errors = 0
                         except Exception as e:
-                         
+                    
                             for r in batch:
                                 save_to_backup(r)
                             batch = []
                             consecutive_errors += 1
-                          
+                           
                             time.sleep(min(30, 2 ** consecutive_errors))
                     else:
-                        
+                     
                         for r in batch:
                             save_to_backup(r)
                         batch = []
-                        time.sleep(5) 
+                        time.sleep(5)  
                         
             except queue.Empty:
-                
+      
                 if batch and time.time() - last_send > BATCH_TIMEOUT:
                     sheet = get_sheet()
                     if sheet:
@@ -110,19 +109,19 @@ if not hasattr(module, '_queues_initialized'):
                     batch = []
                     last_send = time.time()
             except Exception:
-
+         
                 time.sleep(1)
     
     def queue_processor():
-      
+       
         while True:
             try:
                 row = module.global_log_queue.get(timeout=1)
-       
+             
                 try:
                     module.batch_queue.put(row, timeout=1)
                 except queue.Full:
-                  
+                   
                     save_to_backup(row)
                 module.global_log_queue.task_done()
             except queue.Empty:
@@ -186,40 +185,17 @@ input[data-testid="stTextInput"]{height:52px!important;padding:0 16px!important;
 def render_timer(sec:int,tid:str):
     if tid in st.session_state.get("_timer_flags", {}):
         return
-
-    timer_placeholder = st.empty()
-    timer_placeholder.markdown(f"""
-    <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;">
-      Осталось&nbsp;времени: <span id="timer_{tid}">{sec}</span>&nbsp;сек
-    </div>
-    """, unsafe_allow_html=True)
-    
-
     components.html(f"""
+    <div style="font-size:1.2rem;font-weight:bold;color:#111;margin-bottom:10px;margin-left:-8px;">
+      Осталось&nbsp;времени: <span id="t{tid}">{sec}</span>&nbsp;сек
+    </div>
     <script>
       (function(){{
-       
-        function startTimer() {{
-          let t={sec};
-          const span=document.getElementById('timer_{tid}');
-          if(!span) {{
-            setTimeout(startTimer, 100);
-            return;
-          }}
-          const iv=setInterval(()=>{{
-            if(--t<0){{clearInterval(iv);return;}}
-            if(span)span.textContent=t;
-          }},1000);
-        }}
-        
-        if(document.readyState === 'loading') {{
-          document.addEventListener('DOMContentLoaded', startTimer);
-        }} else {{
-          startTimer();
-        }}
+        let t={sec};
+        const span=document.getElementById('t{tid}');
+        const iv=setInterval(()=>{{if(--t<0){{clearInterval(iv);return;}}if(span)span.textContent=t;}},1000);
       }})();
-    </script>""", height=0)
-    
+    </script>""",height=50)
     if "_timer_flags" not in st.session_state:
         st.session_state._timer_flags = {}
     st.session_state._timer_flags[tid]=True
@@ -313,7 +289,7 @@ def finish(a:str):
     t_ms=int((time.time()-st.session_state.phase_start_time)*1000) if st.session_state.phase_start_time else 0
     ok=(clean(a)==clean(q["correct"]) if q["qtype"]=="letters" else a.lower()==q["correct"].lower())
     
-  
+ 
     try:
         module.global_log_queue.put([
             datetime.datetime.utcnow().isoformat(),
@@ -327,10 +303,10 @@ def finish(a:str):
             q["correct"],
             t_ms,
             ok,
-            st.session_state.session_id  
+            st.session_state.session_id 
         ], timeout=1)
     except queue.Full:
-      
+     
         save_to_backup([
             datetime.datetime.utcnow().isoformat(),
             st.session_state.name,
@@ -378,61 +354,39 @@ elapsed=time.time()-st.session_state.phase_start_time
 remaining=max(0,TIME_LIMIT-elapsed)
 
 st.markdown(f"### Вопрос №{cur['№']} из {total}")
+render_timer(math.ceil(remaining),f"{idx}")
 
-
-answer_container = st.container()
-with answer_container:
-    if cur["qtype"]=="corners":
-        sel=st.radio(cur["prompt"],["Да, углы одного цвета.","Нет, углы окрашены в разные цвета.","Затрудняюсь ответить."],index=None,key=f"r_{idx}")
-        if sel:
-            finish("да" if sel.startswith("Да") else "нет" if sel.startswith("Нет") else "затрудняюсь")
-    else:
-        txt=st.text_input(cur["prompt"],key=f"t_{idx}",placeholder="Введите русские буквы и нажмите Enter")
-        col1,_=st.columns([1,3])
-        with col1:
-            if st.button("Не вижу букв",key=f"s_{idx}"):
-                finish("Не вижу")
-        if txt:
-            if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
-                finish(txt.strip())
-            else:
-                st.error("Допустимы только русские буквы и знаки пунктуации.")
-
-
-st.markdown("---")
-
-
-timer_container = st.container()
-with timer_container:
-    render_timer(math.ceil(remaining),f"{idx}")
-
-image_container = st.container()
-with image_container:
+with st.container():
     if remaining>0:
-     
         components.html(f"""
-        <div id="img_{idx}" style="text-align:left;margin:5px 0;opacity:0;transition:opacity 0.3s;">
-          <img src="{cur['img']}" width="300" style="border:1px solid #444;border-radius:8px;" 
-               onload="this.parentElement.style.opacity='1';">
+        <div id="img_{idx}" style="text-align:left;margin:5px 0;">
+          <img src="{cur['img']}" width="300" style="border:1px solid #444;border-radius:8px;">
         </div>
         <script>
-    
-          if(document.readyState === 'loading') {{
-            document.addEventListener('DOMContentLoaded', function() {{
-              setTimeout(()=>{{
-                const c=document.getElementById('img_{idx}');
-                if(c)c.innerHTML='<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';
-              }}, {TIME_LIMIT*1000});
-            }});
-          }} else {{
-            setTimeout(()=>{{
-              const c=document.getElementById('img_{idx}');
-              if(c)c.innerHTML='<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';
-            }}, {TIME_LIMIT*1000});
-          }}
+          setTimeout(()=>{{const c=document.getElementById('img_{idx}');
+            if(c)c.innerHTML='<div style="font-style:italic;color:#666;padding:20px 0;">Время показа изображения истекло.</div>';}},
+            {TIME_LIMIT*1000});
         </script>""",height=310)
     else:
         st.markdown("<div style='text-align:left;font-style:italic;color:#666;padding:40px 0;'>Время показа изображения истекло.</div>",unsafe_allow_html=True)
+
+st.markdown("---")
+
+if cur["qtype"]=="corners":
+    sel=st.radio(cur["prompt"],["Да, углы одного цвета.","Нет, углы окрашены в разные цвета.","Затрудняюсь ответить."],index=None,key=f"r_{idx}")
+    if sel:
+        finish("да" if sel.startswith("Да") else "нет" if sel.startswith("Нет") else "затрудняюсь")
+else:
+    txt=st.text_input(cur["prompt"],key=f"t_{idx}",placeholder="Введите русские буквы и нажмите Enter")
+    col1,_=st.columns([1,3])
+    with col1:
+        if st.button("Не вижу букв",key=f"s_{idx}"):
+            finish("Не вижу")
+    if txt:
+        if re.fullmatch(r"[А-Яа-яЁё ,.;:-]+",txt):
+            finish(txt.strip())
+        else:
+            st.error("Допустимы только русские буквы и знаки пунктуации.")
 
 
 def restore_backups():
