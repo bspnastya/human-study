@@ -12,18 +12,18 @@ st.set_page_config(page_title="Визуализация многоканальн
                    page_icon="🎯", layout="centered",
                    initial_sidebar_state="collapsed")
 
-components.html("""
+components.html(f"""
 <script>
-(function(){{
-  const flag='{flag}', isMobile=window.innerWidth<1024;
-  if(isMobile)document.documentElement.classList.add('mobile-client');
-  const qs=new URLSearchParams(window.location.search);
-  if(isMobile&&!qs.has(flag)){qs.set(flag,'1');window.location.search=qs.toString();}
+(function() {{
+  const flag = '{MOBILE_QS_FLAG}', isMobile = window.innerWidth < 1024;
+  if (isMobile) document.documentElement.classList.add('mobile-client');
+  const qs = new URLSearchParams(window.location.search);
+  if (isMobile && !qs.has(flag)) {{ qs.set(flag,'1'); window.location.search = qs.toString(); }}
 }})();
-</script>""".format(flag=MOBILE_QS_FLAG), height=0)
+</script>""", height=0)
 
-q=st.query_params if hasattr(st,"query_params") else st.experimental_get_query_params()
-if q.get(MOBILE_QS_FLAG)==["1"]:
+q = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
+if q.get(MOBILE_QS_FLAG) == ["1"]:
     st.markdown("""
     <style>
       body{background:#808080;color:#fff;text-align:center;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}
