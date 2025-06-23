@@ -6,12 +6,103 @@ import streamlit as st
 import streamlit.components.v1 as components
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
+import os
+from pathlib import Path
 
 MOBILE_QS_FLAG="mobile"
 st.set_page_config(page_title="Визуализация многоканальных изображений",page_icon="🎯",layout="centered",initial_sidebar_state="collapsed")
 
 if "initialized" not in st.session_state:
-    st.session_state.update(initialized=True,questions=[],idx=0,name="",phase="intro",phase_start_time=None,pause_until=0,_timer_flags={},_local_q=queue.Queue())
+    st.session_state.update(
+        initialized=True,
+        questions=[],
+        idx=0,
+        name="",
+        phase="intro",
+        phase_start_time=None,
+        pause_until=0,
+        _timer_flags={},
+        session_id=secrets.token_hex(8)  
+    )
+
+
+if 'global_log_queue' not in globals():
+    global_log_queue = queue.Queue()
+    
+   
+    batch_queue = queue.Queue()
+    BATCH_SIZE = 5  
+    BATCH_TIMEOUT = 3 
+    
+   
+    BACKUP_DIR = Path("backup_results")
+    BACKUP_DIR.mkdir(exist_ok=True)
+    
+    def save_to_backup(row):
+        timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = BACKUP_DIR / f"backup_{timestamp}_{secrets.token_hex(4)}.json"
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(row, f, ensure_ascii=False)
+        except:
+            pass
+    
+    def batch_writer():
+        batch = []
+        last_send = time.time()
+        
+        while True:
+            try:
+              
+                row = batch_queue.get(timeout=1)
+                batch.append(row)
+                
+        
+                if len(batch) >= BATCH_SIZE or (time.time() - last_send > BATCH_TIMEOUT and batch):
+                    sheet = get_sheet()
+                    if sheet:
+                        try:
+                            
+                            sheet.append_rows(batch, value_input_option="RAW")
+                            batch = []
+                            last_send = time.time()
+                        except Exception as e:
+                           
+                            for r in batch:
+                                save_to_backup(r)
+                            batch = []
+                            time.sleep(2)  
+                    else:
+                      
+                        for r in batch:
+                            save_to_backup(r)
+                        batch = []
+                        
+            except queue.Empty:
+            
+                if batch and time.time() - last_send > BATCH_TIMEOUT:
+                    sheet = get_sheet()
+                    if sheet:
+                        try:
+                            sheet.append_rows(batch, value_input_option="RAW")
+                        except:
+                            for r in batch:
+                                save_to_backup(r)
+                    else:
+                        for r in batch:
+                            save_to_backup(r)
+                    batch = []
+                    last_send = time.time()
+    
+    def queue_processor():
+        while True:
+            row = global_log_queue.get()
+            batch_queue.put(row)
+            global_log_queue.task_done()
+    
+    threading.Thread(target=queue_processor, daemon=True).start()
+    threading.Thread(target=batch_writer, daemon=True).start()
 
 components.html("""
 <script>
@@ -70,22 +161,20 @@ def render_timer(sec:int,tid:str):
 
 @st.cache_resource(show_spinner="Подключение…")
 def get_sheet():
-    try:
-        scopes=["https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive"]
-        gc=gspread.authorize(ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gsp"]),scopes))
-        return gc.open("human_study_results").sheet1
-    except Exception:
-        return None
-SHEET=get_sheet()
-
-def writer(local_q):
-    while True:
-        row=local_q.get()
-        if SHEET:
-            try:SHEET.append_row(row,value_input_option="RAW")
-            except Exception:pass
-        local_q.task_done()
-threading.Thread(target=writer,args=(st.session_state["_local_q"],),daemon=True).start()
+   
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            scopes=["https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive"]
+            gc=gspread.authorize(ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gsp"]),scopes))
+            sheet = gc.open("human_study_results").sheet1
+            return sheet
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt) 
+                continue
+            else:
+                return None
 
 GROUPS=["img1_dif_corners","img2_dif_corners","img3_same_corners_no_symb","img4_same_corners","img5_same_corners"]
 ALGS=["pca_rgb_result","socolov_lab_result","socolov_rgb_result","umap_rgb_result"]
@@ -95,11 +184,20 @@ LETTER={"img1_dif_corners":"ж","img2_dif_corners":"фя","img3_same_corners_no_
 def url(g:str,a:str)->str:return f"{BASE_URL}/{g}_{a}.png"
 def clean(s:str)->set[str]:return set(re.sub(r"[ ,.;:-]+","",s.lower()))
 
-def make_qs()->List[Dict]:
+
+@st.cache_data
+def get_question_template():
+    """Создаем шаблон вопросов один раз и кэшируем"""
     pg={g:[] for g in GROUPS}
     for g,a in itertools.product(GROUPS,ALGS):
-        pg[g]+=[{"group":g,"alg":a,"img":url(g,a),"qtype":"corners","prompt":"Правый верхний и левый нижний угол — одного цвета?","correct":CORNER[g]},
-                {"group":g,"alg":a,"img":url(g,a),"qtype":"letters","prompt":"Если на изображении вы видите буквы, то укажите, какие именно.","correct":LETTER[g]}]
+        pg[g]+=[
+            {"group":g,"alg":a,"img":url(g,a),"qtype":"corners","prompt":"Правый верхний и левый нижний угол — одного цвета?","correct":CORNER[g]},
+            {"group":g,"alg":a,"img":url(g,a),"qtype":"letters","prompt":"Если на изображении вы видите буквы, то укажите, какие именно.","correct":LETTER[g]}
+        ]
+    return pg
+
+def make_qs()->List[Dict]:
+    pg = {k: v.copy() for k, v in get_question_template().items()}
     for v in pg.values():random.shuffle(v)
     seq,prev=[],None
     while any(pg.values()):
@@ -143,7 +241,23 @@ def finish(a:str):
     q=st.session_state.questions[st.session_state.idx]
     t_ms=int((time.time()-st.session_state.phase_start_time)*1000) if st.session_state.phase_start_time else 0
     ok=(clean(a)==clean(q["correct"]) if q["qtype"]=="letters" else a.lower()==q["correct"].lower())
-    st.session_state["_local_q"].put([datetime.datetime.utcnow().isoformat(),st.session_state.name,q["№"],q["group"],q["alg"],q["qtype"],q["prompt"],a,q["correct"],t_ms,ok])
+    
+
+    global_log_queue.put([
+        datetime.datetime.utcnow().isoformat(),
+        st.session_state.name,
+        q["№"],
+        q["group"],
+        q["alg"],
+        q["qtype"],
+        q["prompt"],
+        a,
+        q["correct"],
+        t_ms,
+        ok,
+        st.session_state.session_id  
+    ])
+    
     st.session_state.update(idx=st.session_state.idx+1,phase="intro",phase_start_time=None,pause_until=time.time()+0.5)
     st.rerun()
 
@@ -211,4 +325,27 @@ else:
             st.error("Допустимы только русские буквы и знаки пунктуации.")
 
 
-
+def restore_backups():
+    if 'BACKUP_DIR' in globals():
+        sheet = get_sheet()
+        if not sheet:
+            print("Нет подключения к Google Sheets")
+            return
+        
+        files = sorted(BACKUP_DIR.glob("backup_*.json"))
+        rows = []
+        for f in files:
+            try:
+                with open(f, 'r', encoding='utf-8') as file:
+                    rows.append(json.load(file))
+            except:
+                pass
+        
+        if rows:
+            try:
+                sheet.append_rows(rows, value_input_option="RAW")
+                print(f"Восстановлено {len(rows)} записей")
+                for f in files:
+                    f.unlink()
+            except Exception as e:
+                print(f"Ошибка: {e}")
