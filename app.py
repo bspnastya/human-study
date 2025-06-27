@@ -114,7 +114,7 @@ if not hasattr(module, '_queues_initialized'):
                 time.sleep(1)
     
     def queue_processor():
-        """Перекладывает из основной очереди в батч с защитой от переполнения"""
+     
         while True:
             try:
                 row = module.global_log_queue.get(timeout=1)
@@ -219,7 +219,7 @@ def clean(s:str)->set[str]:return set(re.sub(r"[ ,.;:-]+","",s.lower()))
 
 @st.cache_data
 def get_question_template():
-    """Создаем шаблон вопросов один раз и кэшируем"""
+    
     pg={g:[] for g in GROUPS}
     for g,a in itertools.product(GROUPS,ALGS):
         pg[g]+=[
